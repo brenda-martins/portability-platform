@@ -5,14 +5,14 @@ import java.time.LocalDate;
 
 public record DiscountInstallment(
         String installmentId,
-        String agreementId,
+        AgreementId agreementId,
         BigDecimal amount,
         LocalDate discountDate,
         InstallmentStatus status
 ) {
     public DiscountInstallment {
         Validation.requireNotBlank(installmentId, "installmentId");
-        Validation.requireNotBlank(agreementId, "agreementId");
+        Validation.requireNonNull(agreementId, "agreementId");
         if (amount == null) {
             throw new InvalidRequestException("amount", "amount must not be null");
         }

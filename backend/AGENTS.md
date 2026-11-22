@@ -15,7 +15,7 @@ hexagonal.
 
 ```bash
 mvn spring-boot:run   # API em http://localhost:8080
-mvn test              # smoke test do contexto
+mvn test              # unitários com fakes, contratos HTTP e smoke do contexto
 mvn clean package     # gera target/portability-backend-0.0.1-SNAPSHOT.jar
 ```
 

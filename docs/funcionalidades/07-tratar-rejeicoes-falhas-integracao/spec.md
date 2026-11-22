@@ -27,7 +27,7 @@ Nenhum endpoint novo. Mantêm-se os códigos já documentados no README:
 
 O evento `FALHA_INTEGRACAO` usa o mesmo formato de `AuditEvent` (`eventId`, `operationId`, `eventType`,
 `message`, `occurredAt`), é append-only e não altera `status`, `rejectionReason` nem conta. A mensagem começa
-com o contexto da chamada ("Falha ao consultar status na Central" ou "Falha ao atualizar conta na Central"),
+com o contexto da chamada ("Failed to consult status at Central" ou "Failed to update receiving account at Central"),
 seguido da mensagem da exceção traduzida pelo adapter.
 
 ### Central simulada (`/central`)

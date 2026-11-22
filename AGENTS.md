@@ -2,7 +2,7 @@
 
 > **Finalidade:** este é o arquivo de memória principal do repositório e a fonte de instruções para
 > agentes de IA. Leia-o por completo **antes** de alterar código, contratos, planejamento ou documentação.
-> **Idioma:** documentação em português (pt-BR); identificadores de código em inglês, conforme solicitado.
+> **Idioma:** documentação em português (pt-BR); identificadores de código em inglês.
 
 ## Documentos
 
@@ -12,11 +12,9 @@ Em `docs/` ficam os documentos que definem o produto, a arquitetura e os detalhe
 2. `docs/hld.md`: *high-level design* — decisões de arquitetura, fluxos principais e visão do sistema.
 3. `docs/lld.md`: *low-level design* — ports, mapeamentos, persistência, integração e tratamento de erros.
 4. `docs/design-system.md`: linguagem visual — tokens, componentes, estados e responsividade.
-5. `docs/roadmap.md`: funcionalidades, dependências e status.
-6. `GLOSSARY.md`, na raiz: vocabulário do domínio. Use esses termos nos documentos e no planejamento.
-7. `docs/funcionalidades/`: PRD, spec, tarefas e planos (estrutura em `docs/funcionalidades/README.md`).
-8. `README.md`, na raiz: execução, contratos, modelo de dados e versões das tecnologias.
-9. PDF do desafio (spec imutável) e Apêndice A deste arquivo (registro do uso de IA).
+5. `GLOSSARY.md`, na raiz: vocabulário do domínio. Use esses termos nos documentos e no planejamento.
+6. `docs/funcionalidades/`: PRD e spec (estrutura em `docs/funcionalidades/README.md`).
+7. `README.md`, na raiz: execução, contratos, modelo de dados e versões das tecnologias.
 
 Cada projeto tem o próprio `AGENTS.md`, com os comandos, as particularidades da stack e as práticas de
 código dele:
@@ -32,22 +30,20 @@ código dele:
 | Arquitetura de alto nível e fluxos | `docs/hld.md` |
 | Detalhes de implementação | `docs/lld.md` |
 | Linguagem visual | `docs/design-system.md` |
-| Lista e status das funcionalidades | `docs/roadmap.md` |
 | Vocabulário do domínio | `GLOSSARY.md` |
 | PRD, spec, tarefas e planos | `docs/funcionalidades/<NN>-<titulo>/` |
 | Execução, API, esquema e versões das tecnologias | `README.md` |
 | Convenções, regras de negócio, restrições e processo para agentes | este `AGENTS.md` |
 | Comandos e práticas específicas | `backend/AGENTS.md`, `frontend/AGENTS.md` |
-| Histórico do uso de IA | Apêndice A deste arquivo |
 
 - **Nunca nos dois.** Uma informação tem um dono só; os outros arquivos apontam para ele pelo nome do
   documento e da seção, sem repetir o conteúdo. Resumos são permitidos apenas quando necessários para
   compreensão, e devem indicar o dono.
-- **Documentar funcionalidades e contratos.** PRD, spec, design system e roadmap descrevem o que o
-  sistema faz; README registra execução, API, modelo de dados e versões. Não registre histórico de
-  ajustes técnicos, decisões tomadas durante a implementação nem exceções de planejamento.
-- **HLD e LLD mudam pela skill deles.** Quando uma tarefa altera algo que `docs/hld.md` ou `docs/lld.md`
-  registra, carregue a skill `hld` ou `lld` (se disponível) e use o modo atualizar antes de editar.
+- **Documentar funcionalidades e contratos.** PRD, spec e design system descrevem o que o sistema faz;
+  README registra execução, API, modelo de dados e versões. Não registre histórico de ajustes técnicos,
+  decisões tomadas durante a implementação nem exceções de planejamento.
+- **HLD e LLD:** quando uma tarefa altera algo registrado nesses documentos, atualize o documento dono
+  antes do código.
 - Informações que deveriam estar em arquivos de memória (este `AGENTS.md` e os `AGENTS.md` de projeto)
   não devem ser repetidas nos documentos de arquitetura: faça ponteiros para eles.
 
@@ -59,17 +55,16 @@ beneficiário, consultar sua agenda de descontos futuros na Central de Convênio
 acompanhar a confirmação assíncrona e exibir a trilha de auditoria. O detalhamento está em
 `docs/product-brief.md`.
 
-> Não apresente stubs como funcionalidade pronta. Ao implementar algo, remova o stub correspondente e
-> atualize o status em `docs/roadmap.md`.
+> Não apresente stubs como funcionalidade pronta. Ao implementar algo, remova o stub correspondente.
 
 ## Especificações e ordem de precedência
 
 Sempre consulte as especificações antes de implementar. Em caso de dúvida, **pergunte**; nunca resolva
 uma ambiguidade silenciosamente.
 
-1. **Requisitos do usuário:** registrados no Apêndice A.
+1. **Requisitos do usuário:** os pedidos feitos na conversa.
 2. **Documentos de produto e arquitetura:** `docs/product-brief.md`, `docs/hld.md`, `docs/lld.md`,
-   `docs/design-system.md`, `docs/roadmap.md` e `GLOSSARY.md`.
+   `docs/design-system.md` e `GLOSSARY.md`.
 3. **Este `AGENTS.md`** e os `AGENTS.md` de projeto: convenções, restrições e processo.
 4. **`README.md`:** execução, contratos expostos e modelo de dados.
 
@@ -106,7 +101,7 @@ Visão completa e fluxos: `docs/hld.md`. Detalhes: `docs/lld.md`. Contratos: `RE
 
 ```text
 portability-platform/
-├── AGENTS.md                      # este arquivo (memória + registro do harness)
+├── AGENTS.md                      # este arquivo (memória de regras e comandos)
 ├── README.md                      # documentação pública do projeto
 ├── GLOSSARY.md                    # vocabulário do domínio
 ├── compose.yaml                   # PostgreSQL local para desenvolvimento
@@ -116,7 +111,6 @@ portability-platform/
 │   ├── hld.md
 │   ├── lld.md
 │   ├── design-system.md
-│   ├── roadmap.md
 │   └── funcionalidades/
 │       ├── README.md              # convenções de PRD/spec/tarefa/plano
 │       └── <NN>-<titulo>/         # criado quando a funcionalidade começar
@@ -134,8 +128,8 @@ portability-platform/
 │       │   │   └── ports/{in,out}/ # casos de uso e integrações
 │       │   ├── application/        # orquestração dos casos de uso
 │       │   └── adapters/
-│       │       ├── in/web/         # controllers REST (/api)
-│       │       └── out/{persistence,central}/  # JPA, cliente e mock
+│       │       ├── in/{web,config}/  # controllers REST (/api) e composition root
+│       │       └── out/{central,persistence,ids,metrics,timing,transaction}/
 │       ├── main/resources/application.yml
 │       └── test/java/com/portability/
 └── frontend/
@@ -159,40 +153,38 @@ Comandos, pré-requisitos e configuração: README, seção "Execução". Comand
 
 ## Planejamento
 
-O planejamento e a documentação das funcionalidades ficam em arquivos Markdown locais, que são o issue
-tracker do projeto. As skills que publicam em tracker gravam nesses arquivos, sem rótulos de triagem.
-A hierarquia é **funcionalidade → tarefa**, e cada funcionalidade tem dois documentos: PRD e spec.
+O planejamento e a documentação das funcionalidades ficam em `docs/funcionalidades/`, que é o issue
+tracker do projeto, sem rótulos de triagem. A hierarquia é **funcionalidade → tarefa**, e cada
+funcionalidade tem dois documentos: PRD e spec.
 
 - **Funcionalidade:** uma entrega demonstrável no produto, descrita só pelo que a pessoa consegue fazer,
   sem detalhes técnicos. Não é a Fase do `docs/product-brief.md`. O número é global, sequencial e não
   muda depois de atribuído. Na documentação de planejamento, "funcionalidade" tem sempre este sentido;
   para o sentido comum, use "recurso" ou "comportamento".
 - **PRD:** requisitos de produto da funcionalidade (problema, fluxos, histórias, critérios de aceite,
-  fora de escopo), feito pela skill `/prd` (quando disponível; caso contrário, siga o formato
-  manualmente). Aponta para `docs/product-brief.md` em vez de repetir métricas e requisitos gerais.
+  fora de escopo). Aponta para `docs/product-brief.md` em vez de repetir métricas e requisitos gerais.
 - **Spec:** como a funcionalidade será construída (decisões de implementação e de teste). Segue
   `docs/hld.md`, `docs/lld.md` e o README, apontando para eles.
 - **Tarefa:** parte entregável de uma funcionalidade, derivada da spec. É onde entra o trabalho técnico.
-  Antes do código, cada tarefa ganha um **plano**, feito pela skill `/plan-task` (quando disponível),
-  aprovado pelo usuário. Depois disso o plano fica congelado como registro do que foi aprovado: só o
-  usuário o descongela. Uma decisão que se mostrar errada é corrigida na spec, no LLD ou numa tarefa
-  nova. Fora da pasta da funcionalidade, a tarefa é `F<NN>-T<NN>`. Versionar o plano em Git só acontece
-  se o usuário pedir expressamente, conforme "Convenções de Git".
-- **Melhoria do roadmap:** implemente a melhoria solicitada consultando as specs existentes e atualize
-  os documentos donos que forem afetados. Não crie PRD, spec, tarefa, plano ou nova funcionalidade só
+  Antes do código, cada tarefa ganha um **plano**, aprovado pelo usuário. Depois disso o plano fica
+  congelado como registro do que foi aprovado: só o usuário o descongela. Uma decisão que se mostrar
+  errada é corrigida na spec, no LLD ou numa tarefa nova. Fora da pasta da funcionalidade, a tarefa é
+  `F<NN>-T<NN>`. Versionar o plano em Git só acontece se o usuário pedir expressamente, conforme
+  "Convenções de Git".
+- **Melhoria solicitada:** implemente a melhoria pedida consultando as specs existentes e atualize os
+  documentos donos que forem afetados. Não crie PRD, spec, tarefa, plano ou nova funcionalidade só
   para executar uma melhoria; crie esses artefatos apenas quando o usuário pedir planejamento ou quando
   a solicitação iniciar uma nova funcionalidade. Resolva ambiguidades na conversa antes de implementar.
 
-Estrutura, numeração e status: `docs/roadmap.md` e `docs/funcionalidades/README.md`.
-O status da funcionalidade mora no roadmap; o da tarefa, no campo `Status` do `tarefa.md`.
-
+Estrutura e numeração: `docs/funcionalidades/README.md`. O status da tarefa mora no campo `Status` do
+`tarefa.md`.
 
 ## Diretrizes para criação de funcionalidades
 
 - Trabalhe em **fatias verticais** de uma única tarefa por vez:
   modelo/port de domínio → caso de uso → adapters → endpoint → UI → testes → documentação.
-- Antes de codificar, identifique a funcionalidade no roadmap e a spec que cobre a tarefa; se não houver
-  PRD/spec, escreva-os e confirme com o usuário (ver SDD).
+- Antes de codificar, identifique a funcionalidade e a spec que cobre a tarefa; se não houver PRD/spec,
+  escreva-os e confirme com o usuário (ver SDD).
 - Mantenha os stubs restantes honestos: não implementar "um pedacinho" de outra funcionalidade para
   fazer a atual parecer completa.
 - Não crie endpoint, DTO ou tabela sem um caso de uso que o justifique. Não duplique responsabilidade
@@ -200,8 +192,8 @@ O status da funcionalidade mora no roadmap; o da tarefa, no campo `Status` do `t
 - Valide entradas na borda e aplique invariantes no domínio; trate erros em todos os caminhos, inclusive
   falhas parciais da Central.
 - Qualquer alteração de contrato (JSON, status HTTP, nome de porta, schema) exige atualização do README,
-  de `docs/lld.md`, dos DTOs, dos testes e do registro de decisões. O PDF é imutável.
-- Se a solicitação fugir do escopo atual, registre-a no roadmap e pare; não a implemente "de graça".
+  de `docs/lld.md`, dos DTOs e dos testes. O PDF é imutável.
+- Se a solicitação fugir do escopo atual, pare e informe o limite ao usuário; não a implemente "de graça".
 
 ## Diretrizes para testes
 
@@ -211,9 +203,9 @@ O status da funcionalidade mora no roadmap; o da tarefa, no campo `Status` do `t
 - Cenários críticos obrigatórios quando a funcionalidade existir: idempotência (reenvio), falha de
   integração (timeout/indisponibilidade/resposta inesperada), transições de estado e trilha de auditoria
   append-only, assinatura/HMAC e rejeição.
+- Nomes e mensagens de testes em inglês, com nomes no formato `should ... when ...`.
 - **Frontend:** Vitest + Testing Library + jsdom. Teste comportamento observável (o que o usuário vê e
-  faz). Mock `apiFetch`, não o `fetch` global. Um comportamento por teste, nomes descritivos no formato
-  `deve ... quando ...`.
+  faz). Mock `apiFetch`, não o `fetch` global. Um comportamento por teste.
 - Nunca desabilite, pule ou enfraqueca teste para deixar o build verde. Corrija a causa.
 - Todo teste adicionado deve passar na Verificação completa (abaixo).
 
@@ -221,15 +213,14 @@ O status da funcionalidade mora no roadmap; o da tarefa, no campo `Status` do `t
 
 - `README.md` é a porta de entrada pública e o dono de execução, API, esquema e versões das tecnologias.
   Atualize-o somente quando um desses conteúdos mudar — não para registrar cada alteração de código.
-- `docs/` é o dono de produto, arquitetura, design e roadmap; `AGENTS.md` e os `AGENTS.md` de projeto são
-  a memória de regras e comandos. **Uma informação tem um dono só**; os demais arquivos apontam para ele
+- `docs/` é o dono de produto, arquitetura e design; `AGENTS.md` e os `AGENTS.md` de projeto são a
+  memória de regras e comandos. **Uma informação tem um dono só**; os demais arquivos apontam para ele
   pelo nome do documento e da seção, sem repetir o conteúdo.
 - A documentação descreve funcionalidades e contratos. Não escreva registros de mudanças, justificativas
   de decisões pontuais nem notas sobre exceções de planejamento.
 - Documentação em pt-BR; nomes de código, endpoints e variáveis em inglês (ou em pt-BR quando o contrato
   da Central exigir). Diagramas em Mermaid, versionáveis e revisáveis como texto.
 - Não documente código morto como se estivesse ativo. Se um endpoint é placeholder, diga explicitamente.
-- O PDF permanece como spec de origem; o Apêndice A guarda o registro de uso de IA exigido pela entrega.
 - Toda tarefa que cria um comando novo (suíte de testes, lint, etc.) o acrescenta à Verificação completa.
 
 ## Restrições arquiteturais
@@ -254,7 +245,7 @@ Nenhuma implementação começa sem spec. O fluxo é **sequencial**; não pule e
 
 1. **Consultar** o PDF, os requisitos do usuário, `docs/`, este arquivo, os `AGENTS.md` de projeto e o
    README.
-2. **Localizar a spec aplicável:** para uma melhoria do roadmap, use as specs existentes e não crie
+2. **Localizar a spec aplicável:** para uma melhoria solicitada, use as specs existentes e não crie
    artefatos de planejamento; para uma nova funcionalidade, siga PRD → spec → tarefa → plano, conforme
    "Planejamento". Registre comportamento observável, critérios de aceite e contratos afetados na spec
    existente quando necessário. Se algo estiver ambíguo, pergunte antes de implementar.
@@ -266,13 +257,13 @@ Nenhuma implementação começa sem spec. O fluxo é **sequencial**; não pule e
    TODOs explícitos.
 6. **Refatorar (refactor):** simplificar sem alterar comportamento; rodar os testes novamente.
 7. **Verificar:** executar a Verificação completa de todos os projetos tocados.
-8. **Documentar e reportar:** atualizar apenas o que descreve funcionalidades e contratos — roadmap,
-   PRD/spec e README quando houver mudança de execução, API ou esquema. Relate mudanças, testes
+8. **Documentar e reportar:** atualizar apenas o que descreve funcionalidades e contratos — PRD/spec e
+   README quando houver mudança de execução, API ou esquema. Relate mudanças, testes
    executados, riscos e próximos passos na resposta, não em arquivos de registro de alterações.
 
 **Gates:** se a spec mudar durante a implementação, volte à etapa 2; mude o plano somente com a
-autorização do usuário. Se a solicitação estiver fora do escopo, registre-a no roadmap e pare. Se um
-teste não puder ser escrito, explique o motivo antes de implementar.
+autorização do usuário. Se a solicitação estiver fora do escopo, pare e informe o limite ao usuário. Se
+um teste não puder ser escrito, explique o motivo antes de implementar.
 
 ## Convenções de Git
 
@@ -300,8 +291,7 @@ assinaturas a partir da memória do modelo.
 
 Sempre carregue as skills necessárias para a tarefa. Há skills de convenções e boas práticas
 (`code-review`, `codebase-design`, `diagnosing-bugs`, `domain-modeling`, `report`, `research`, `tdd`,
-`writing-for-agents`, entre outras), além das específicas de domínio. Carregue `prd`, `plan-task`, `hld`
-e `lld` quando estiverem disponíveis para as tarefas de planejamento e arquitetura descritas acima.
+`writing-for-agents`, entre outras).
 
 Quando uma skill divergir dos arquivos de memória (`AGENTS.md` e rules), o que está no `AGENTS.md`
 prevalece.

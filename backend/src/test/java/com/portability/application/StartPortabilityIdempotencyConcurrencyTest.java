@@ -4,11 +4,15 @@ import com.portability.adapters.out.persistence.SpringDataAuditEventRepository;
 import com.portability.adapters.out.persistence.SpringDataIdempotencyReservationRepository;
 import com.portability.adapters.out.persistence.SpringDataOperationRepository;
 import com.portability.adapters.out.persistence.SpringDataAuthorizationRepository;
+import com.portability.domain.model.AgreementId;
 import com.portability.domain.model.Authorization;
+import com.portability.domain.model.BeneficiaryId;
 import com.portability.domain.model.DiscountInstallment;
 import com.portability.domain.model.InstallmentStatus;
 import com.portability.domain.model.PortabilityOperationResult;
+import com.portability.domain.model.Protocol;
 import com.portability.domain.model.ReceivingAccount;
+import com.portability.domain.model.StartPortabilityCommand;
 import com.portability.domain.ports.in.StartPortabilityUseCase;
 import com.portability.domain.ports.out.AuthorizationRepository;
 import com.portability.domain.ports.out.CentralAuthorizationPort;
@@ -33,8 +37,6 @@ import java.util.concurrent.Future;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyList;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -75,13 +77,13 @@ class StartPortabilityIdempotencyConcurrencyTest {
 
     @Test
     void mustRegisterOnlyOneOperationWhenIdenticalRequestsRace() throws Exception {
-        authorizationRepository.save(new Authorization(
-                "AUT-CC-1", "BEN-123", "AGR-001", Instant.parse("2026-11-22T12:34:56Z")));
-        when(((DiscountAgendaPort) centralClient).fetchAgenda("BEN-123")).thenReturn(List.of(new DiscountInstallment(
-                "INS-1", "AGR-001", new BigDecimal("120.50"),
-                LocalDate.parse("2099-01-10"), InstallmentStatus.OPEN)));
-        when(centralClient.registerPortability(anyString(), anyList(), anyString(), any()))
-                .thenReturn("PRT-CC-1");
+        authorizationRepository.save(new Authorization("AUT-CC-1", new BeneficiaryId("BEN-123"),
+                new AgreementId("AGR-001"), Instant.parse("2026-11-22T12:34:56Z")));
+        when(((DiscountAgendaPort) centralClient).fetchAgenda(new BeneficiaryId("BEN-123")))
+                .thenReturn(List.of(new DiscountInstallment("INS-1", new AgreementId("AGR-001"),
+                        new BigDecimal("120.50"), LocalDate.parse("2099-01-10"), InstallmentStatus.OPEN)));
+        when(centralClient.registerPortability(any(StartPortabilityCommand.class)))
+                .thenReturn(new Protocol("PRT-CC-1"));
 
         ExecutorService executor = Executors.newFixedThreadPool(2);
         CountDownLatch start = new CountDownLatch(1);
@@ -90,8 +92,7 @@ class StartPortabilityIdempotencyConcurrencyTest {
             for (int i = 0; i < 2; i++) {
                 futures.add(executor.submit(() -> {
                     start.await();
-                    return startPortabilityUseCase.startPortability("BEN-123", List.of("INS-1"),
-                            "Nova Credora S.A.", new ReceivingAccount("001", "1234", "56789-0"));
+                    return startPortabilityUseCase.startPortability(command());
                 }));
             }
             start.countDown();
@@ -108,9 +109,14 @@ class StartPortabilityIdempotencyConcurrencyTest {
             executor.shutdownNow();
         }
 
-        verify(centralClient, times(1)).registerPortability(anyString(), anyList(), anyString(), any());
+        verify(centralClient, times(1)).registerPortability(any(StartPortabilityCommand.class));
         assertEquals(1, springOperations.count());
         assertEquals(1, springAuditEvents.count());
         assertEquals(1, springReservations.count());
+    }
+
+    private static StartPortabilityCommand command() {
+        return new StartPortabilityCommand(new BeneficiaryId("BEN-123"), List.of("INS-1"),
+                "Nova Credora S.A.", new ReceivingAccount("001", "1234", "56789-0"));
     }
 }

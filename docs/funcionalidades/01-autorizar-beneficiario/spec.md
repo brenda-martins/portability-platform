@@ -35,11 +35,11 @@ inválidos e `401` para assinatura ausente/inválida.
 
 ### Ports
 
-`CentralAuthorizationPort.registerAuthorization(beneficiaryId, agreementId): String` devolve o
+`CentralAuthorizationPort.registerAuthorization(BeneficiaryId, AgreementId): String` devolve o
 `autorizacaoId` da Central. `CentralClient` implementa o port e usa `CentralRequestCodec` para montar o
 payload em pt-BR, assinar o corpo canônico e enviar o HMAC no campo `assinatura` e no cabeçalho.
 
-`RegisterAuthorizationUseCase.registerAuthorization(beneficiaryId, agreementId): AuthorizationResult`
+`RegisterAuthorizationUseCase.registerAuthorization(BeneficiaryId, AgreementId): AuthorizationResult`
 devolve a autorização e o indicador `created`, para que a borda HTTP escolha entre `201` e `200`.
 
 ## Decisões de implementação

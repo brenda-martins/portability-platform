@@ -22,7 +22,7 @@ describe('apiFetch', () => {
     vi.unstubAllGlobals();
   });
 
-  it('deve enviar um correlationId gerado quando a requisição é feita', async () => {
+  it('should send a generated correlationId when a request is made', async () => {
     const fetchMock = vi.fn().mockResolvedValue(responseWith(200, { status: 'ok' }));
     vi.stubGlobal('fetch', fetchMock);
 
@@ -32,7 +32,7 @@ describe('apiFetch', () => {
     expect(sentCorrelationId(fetchMock).length).toBeGreaterThan(0);
   });
 
-  it('deve usar o correlationId devolvido pela API quando a resposta falha', async () => {
+  it('should use the correlationId returned by the API when the response fails', async () => {
     const fetchMock = vi.fn().mockResolvedValue(responseWith(502, {
       message: 'Central indisponível',
       correlationId: 'corr-123',
@@ -45,7 +45,25 @@ describe('apiFetch', () => {
     expect(error).toMatchObject({ message: 'Central indisponível', correlationId: 'corr-123', status: 502 });
   });
 
-  it('deve usar o correlationId enviado quando a API não devolve um', async () => {
+  it('should keep the HTTP status message when the error body is not JSON', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 502,
+      statusText: 'Bad Gateway',
+      json: async () => {
+        throw new SyntaxError('Unexpected token');
+      },
+    } as unknown as Response);
+    vi.stubGlobal('fetch', fetchMock);
+
+    const error = await apiFetch('/portability').catch((cause: unknown) => cause) as ApiError;
+
+    expect(error).toBeInstanceOf(ApiError);
+    expect(error.message).toBe('Request failed: 502 Bad Gateway');
+    expect(error.correlationId).toBe(sentCorrelationId(fetchMock));
+  });
+
+  it('should use the sent correlationId when the API does not return one', async () => {
     const fetchMock = vi.fn().mockResolvedValue(responseWith(502, { message: 'Central indisponível' }));
     vi.stubGlobal('fetch', fetchMock);
 

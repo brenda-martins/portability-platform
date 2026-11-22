@@ -62,11 +62,13 @@ ordem e verifica o HMAC. O mesmo codec é usado pelo opt-in (F01) e pela atualiz
 
 ### Ports e modelo
 
-- `StartPortabilityUseCase.startPortability(...)` devolve
-  `PortabilityOperationResult(operation, created)`, espelhando `AuthorizationResult` da F01.
-- `CentralPortabilityPort.registerPortability(...)` não recebe assinatura: a assinatura passa a ser
-  responsabilidade do adapter, que conhece o contrato em pt-BR.
-- `OperationRepository.findByIdempotencyKey(String)` localiza o reenvio;
+- `StartPortabilityUseCase.startPortability(StartPortabilityCommand)` devolve
+  `PortabilityOperationResult(operation, created)`, espelhando `AuthorizationResult` da F01. O command
+  reúne `beneficiaryId` (`BeneficiaryId`), `installmentIds`, `creditorAssignee` e `receivingAccount`.
+- `CentralPortabilityPort.registerPortability(StartPortabilityCommand): Protocol` não recebe assinatura:
+  a assinatura passa a ser responsabilidade do adapter, que conhece o contrato em pt-BR.
+- `OperationRepository.findById(OperationId)` localiza a operação;
+  `findByIdempotencyKey(String)` localiza o reenvio;
   `reserveIdempotencyKey(String)` reserva a chave antes da integração e sinaliza conflito com
   `DuplicateIdempotencyKeyException`; `save(PortabilityOperation, String)` insere a operação nova com a
   chave de idempotência e `save(PortabilityOperation)` persiste o estado completo com a versão esperada.
@@ -80,9 +82,10 @@ ordem e verifica o HMAC. O mesmo codec é usado pelo opt-in (F01) e pela atualiz
   `validate()` antes do caso de uso. `ApiExceptionHandler` devolve `400` com `fields` para
   `InvalidRequestException` e `409` para outras violações de unicidade; conflito de reserva da chave é
   resolvido no caso de uso como reenvio.
-- `StartPortabilityService` valida os campos, calcula a chave SHA-256 em hex de
-  `beneficiaryId|parcelas ordenadas|credor|banco|agência|conta`, consulta `findByIdempotencyKey` e reserva
-  a chave em `idempotency_reservations`. Se a operação existir, devolve-a com `created = false` **antes**
+- `StartPortabilityService` recebe o command validado, calcula a chave SHA-256 em hex de
+  `beneficiaryId|parcelas ordenadas|credor|banco|agência|conta` em
+  `PortabilityOperation.idempotencyKey(command)`, consulta `findByIdempotencyKey` e reserva a chave em
+  `idempotency_reservations`. Se a operação existir, devolve-a com `created = false` **antes**
   de qualquer chamada à Central. Se a reserva conflitar com outra transação já confirmada, uma nova
   transação lê a operação existente e devolve `created = false`. Caso contrário, verifica a autorização do
   beneficiário, busca a agenda em `DiscountAgendaPort`, exige que

@@ -1,7 +1,9 @@
 package com.portability.adapters.in.web.input;
 
+import com.portability.domain.model.BeneficiaryId;
 import com.portability.domain.model.InvalidRequestException;
 import com.portability.domain.model.ReceivingAccount;
+import com.portability.domain.model.StartPortabilityCommand;
 import com.portability.domain.model.Validation;
 
 import java.util.List;
@@ -20,7 +22,12 @@ public record PortabilityRequest(
         account();
     }
 
-    public ReceivingAccount account() {
+    public StartPortabilityCommand toCommand() {
+        return new StartPortabilityCommand(
+                new BeneficiaryId(beneficiaryId), installmentIds, creditorAssignee, account());
+    }
+
+    private ReceivingAccount account() {
         if (receivingAccount == null) {
             throw new InvalidRequestException(
                     "receivingAccount", "receivingAccount must not be null");

@@ -1,11 +1,15 @@
 package com.portability.adapters.out.central;
 
 import com.portability.adapters.in.config.CentralProperties;
+import com.portability.domain.model.AgreementId;
+import com.portability.domain.model.BeneficiaryId;
 import com.portability.domain.model.CentralOperationStatus;
 import com.portability.domain.model.DiscountInstallment;
 import com.portability.domain.model.InstallmentStatus;
 import com.portability.domain.model.OperationStatus;
+import com.portability.domain.model.Protocol;
 import com.portability.domain.model.ReceivingAccount;
+import com.portability.domain.model.StartPortabilityCommand;
 import com.portability.domain.ports.out.CentralAuthorizationPort;
 import com.portability.domain.ports.out.CentralPortabilityPort;
 import com.portability.domain.ports.out.CentralUnavailableException;
@@ -59,7 +63,7 @@ public class CentralClient implements DiscountAgendaPort, CentralPortabilityPort
     }
 
     @Override
-    public String registerAuthorization(String beneficiaryId, String agreementId) {
+    public String registerAuthorization(BeneficiaryId beneficiaryId, AgreementId agreementId) {
         CentralRequestCodec.SignedRequest request = codec.authorization(beneficiaryId, agreementId);
         try {
             ResponseEntity<CentralAuthorizationResponse> response = restClient.post()
@@ -77,32 +81,30 @@ public class CentralClient implements DiscountAgendaPort, CentralPortabilityPort
             }
             return payload.autorizacaoId();
         } catch (RestClientException | JacksonException exception) {
-            throw new CentralUnavailableException("Central indisponível", exception);
+            throw new CentralUnavailableException("Central unavailable", exception);
         }
     }
 
     @Override
-    public List<DiscountInstallment> fetchAgenda(String beneficiaryId) {
+    public List<DiscountInstallment> fetchAgenda(BeneficiaryId beneficiaryId) {
         try {
             ResponseEntity<CentralInstallment[]> response = restClient.get()
-                    .uri("/beneficiarios/{beneficiaryId}/agenda", beneficiaryId)
+                    .uri("/beneficiarios/{beneficiaryId}/agenda", beneficiaryId.value())
                     .retrieve()
                     .toEntity(CentralInstallment[].class);
             CentralInstallment[] items = response.getBody();
             if (response.getStatusCode() != HttpStatus.OK || items == null) {
-                throw new CentralUnavailableException("Resposta inesperada da Central");
+                throw new CentralUnavailableException("Unexpected response from Central");
             }
             return Arrays.stream(items).map(CentralClient::toDomain).toList();
         } catch (RestClientException | JacksonException exception) {
-            throw new CentralUnavailableException("Central indisponível", exception);
+            throw new CentralUnavailableException("Central unavailable", exception);
         }
     }
 
     @Override
-    public String registerPortability(String beneficiaryId, List<String> installmentIds,
-            String creditorAssignee, ReceivingAccount receivingAccount) {
-        CentralRequestCodec.SignedRequest request = codec.portability(
-                beneficiaryId, installmentIds, creditorAssignee, receivingAccount);
+    public Protocol registerPortability(StartPortabilityCommand command) {
+        CentralRequestCodec.SignedRequest request = codec.portability(command);
         try {
             ResponseEntity<CentralOperationResponse> response = restClient.post()
                     .uri("/operacoes-portabilidade")
@@ -115,19 +117,19 @@ public class CentralClient implements DiscountAgendaPort, CentralPortabilityPort
             CentralOperationResponse result = response.getBody();
             if (response.getStatusCode() != HttpStatus.ACCEPTED
                     || result == null || isBlank(result.protocolo())) {
-                throw new CentralUnavailableException("Resposta inesperada da Central");
+                throw new CentralUnavailableException("Unexpected response from Central");
             }
-            return result.protocolo();
+            return new Protocol(result.protocolo());
         } catch (RestClientException | JacksonException exception) {
-            throw new CentralUnavailableException("Central indisponível", exception);
+            throw new CentralUnavailableException("Central unavailable", exception);
         }
     }
 
     @Override
-    public CentralOperationStatus consultStatus(String protocol) {
+    public CentralOperationStatus consultStatus(Protocol protocol) {
         try {
             ResponseEntity<CentralOperationStatusResponse> response = restClient.get()
-                    .uri("/operacoes-portabilidade/{protocol}", protocol)
+                    .uri("/operacoes-portabilidade/{protocol}", protocol.value())
                     .retrieve()
                     .toEntity(CentralOperationStatusResponse.class);
 
@@ -135,34 +137,34 @@ public class CentralClient implements DiscountAgendaPort, CentralPortabilityPort
                 return new CentralOperationStatus(OperationStatus.PENDING, null, retryAfter(response));
             }
             if (response.getStatusCode() != HttpStatus.OK) {
-                throw new CentralUnavailableException("Resposta inesperada da Central");
+                throw new CentralUnavailableException("Unexpected response from Central");
             }
             CentralOperationStatusResponse payload = response.getBody();
             if (payload == null || isBlank(payload.status())) {
-                throw new CentralUnavailableException("Resposta inesperada da Central");
+                throw new CentralUnavailableException("Unexpected response from Central");
             }
             OperationStatus status = switch (payload.status()) {
                 case "PENDENTE" -> OperationStatus.PENDING;
                 case "CONFIRMADA" -> OperationStatus.CONFIRMED;
                 case "REJEITADA" -> OperationStatus.REJECTED;
-                default -> throw new CentralUnavailableException("Resposta inesperada da Central");
+                default -> throw new CentralUnavailableException("Unexpected response from Central");
             };
             if (status == OperationStatus.REJECTED && isBlank(payload.motivoRejeicao())) {
-                throw new CentralUnavailableException("Resposta inesperada da Central");
+                throw new CentralUnavailableException("Unexpected response from Central");
             }
             Duration retryAfter = status == OperationStatus.PENDING ? retryAfter(response) : Duration.ZERO;
             return new CentralOperationStatus(status, payload.motivoRejeicao(), retryAfter);
         } catch (RestClientException | JacksonException exception) {
-            throw new CentralUnavailableException("Central indisponível", exception);
+            throw new CentralUnavailableException("Central unavailable", exception);
         }
     }
 
     @Override
-    public ReceivingAccount updateReceivingAccount(String protocol, ReceivingAccount receivingAccount) {
+    public ReceivingAccount updateReceivingAccount(Protocol protocol, ReceivingAccount receivingAccount) {
         CentralRequestCodec.SignedRequest request = codec.accountUpdate(protocol, receivingAccount);
         try {
             ResponseEntity<CentralReceivingAccountResponse> response = restClient.put()
-                    .uri("/operacoes-portabilidade/{protocol}/conta-recebimento", protocol)
+                    .uri("/operacoes-portabilidade/{protocol}/conta-recebimento", protocol.value())
                     .contentType(MediaType.APPLICATION_JSON)
                     .header("X-Signature", request.signature())
                     .body(request.body())
@@ -173,30 +175,30 @@ public class CentralClient implements DiscountAgendaPort, CentralPortabilityPort
             if (response.getStatusCode() != HttpStatus.OK
                     || result == null || isBlank(result.banco())
                     || isBlank(result.agencia()) || isBlank(result.conta())) {
-                throw new CentralUnavailableException("Resposta inesperada da Central");
+                throw new CentralUnavailableException("Unexpected response from Central");
             }
             return new ReceivingAccount(result.banco(), result.agencia(), result.conta());
         } catch (RestClientException | JacksonException exception) {
-            throw new CentralUnavailableException("Central indisponível", exception);
+            throw new CentralUnavailableException("Central unavailable", exception);
         }
     }
 
     private static DiscountInstallment toDomain(CentralInstallment item) {
         if (item == null || isBlank(item.parcelaId()) || isBlank(item.convenioId())
                 || item.valor() == null || isBlank(item.dataDesconto()) || isBlank(item.status())) {
-            throw new CentralUnavailableException("Resposta inesperada da Central");
+            throw new CentralUnavailableException("Unexpected response from Central");
         }
         InstallmentStatus status = switch (item.status()) {
             case "ABERTA" -> InstallmentStatus.OPEN;
             case "PORTADA" -> InstallmentStatus.PORTED;
             case "CANCELADA" -> InstallmentStatus.CANCELLED;
-            default -> throw new CentralUnavailableException("Resposta inesperada da Central");
+            default -> throw new CentralUnavailableException("Unexpected response from Central");
         };
         try {
-            return new DiscountInstallment(item.parcelaId(), item.convenioId(), item.valor(),
+            return new DiscountInstallment(item.parcelaId(), new AgreementId(item.convenioId()), item.valor(),
                     LocalDate.parse(item.dataDesconto()), status);
         } catch (DateTimeParseException exception) {
-            throw new CentralUnavailableException("Resposta inesperada da Central", exception);
+            throw new CentralUnavailableException("Unexpected response from Central", exception);
         }
     }
 
@@ -208,7 +210,7 @@ public class CentralClient implements DiscountAgendaPort, CentralPortabilityPort
         try {
             return Duration.ofSeconds(Long.parseLong(header.trim()));
         } catch (NumberFormatException exception) {
-            throw new CentralUnavailableException("Retry-After inválido da Central", exception);
+            throw new CentralUnavailableException("Invalid Retry-After from Central", exception);
         }
     }
 

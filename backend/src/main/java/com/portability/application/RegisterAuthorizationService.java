@@ -1,8 +1,9 @@
 package com.portability.application;
 
+import com.portability.domain.model.AgreementId;
 import com.portability.domain.model.Authorization;
 import com.portability.domain.model.AuthorizationResult;
-import com.portability.domain.model.Validation;
+import com.portability.domain.model.BeneficiaryId;
 import com.portability.domain.ports.in.RegisterAuthorizationUseCase;
 import com.portability.domain.ports.out.AuthorizationRepository;
 import com.portability.domain.ports.out.CentralAuthorizationPort;
@@ -23,9 +24,9 @@ public class RegisterAuthorizationService implements RegisterAuthorizationUseCas
 
     public RegisterAuthorizationService(
         final AuthorizationRepository authorizationRepository,
-        final CentralAuthorizationPort centralAuthorizationPort, 
+        final CentralAuthorizationPort centralAuthorizationPort,
         final TransactionPort transactions,
-        final Clock clock, 
+        final Clock clock,
         final MetricsPort metrics
     ) {
         this.authorizationRepository = authorizationRepository;
@@ -36,10 +37,7 @@ public class RegisterAuthorizationService implements RegisterAuthorizationUseCas
     }
 
     @Override
-    public AuthorizationResult registerAuthorization(String beneficiaryId, String agreementId) {
-        Validation.requireNotBlank(beneficiaryId, "beneficiaryId");
-        Validation.requireNotBlank(agreementId, "agreementId");
-        
+    public AuthorizationResult registerAuthorization(BeneficiaryId beneficiaryId, AgreementId agreementId) {
         return transactions.inTransaction(() -> {
             Optional<Authorization> existing = authorizationRepository
                     .findByBeneficiaryAndAgreement(beneficiaryId, agreementId);

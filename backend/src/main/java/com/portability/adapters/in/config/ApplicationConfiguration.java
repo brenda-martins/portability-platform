@@ -3,6 +3,7 @@ package com.portability.adapters.in.config;
 import com.portability.application.GetDiscountAgendaService;
 import com.portability.application.GetOperationAuditService;
 import com.portability.application.GetOperationStatusService;
+import com.portability.application.IntegrationFailureRecorder;
 import com.portability.application.RegisterAuthorizationService;
 import com.portability.application.StartPortabilityService;
 import com.portability.application.UpdateReceivingAccountService;
@@ -36,6 +37,17 @@ public class ApplicationConfiguration {
     @Bean
     public Clock clock() {
         return Clock.systemUTC();
+    }
+
+    @Bean
+    public IntegrationFailureRecorder integrationFailureRecorder(
+            AuditEventRepository auditEventRepository,
+            TransactionPort transactions,
+            Clock clock,
+            IdGenerator ids,
+            MetricsPort metrics
+        ) {
+        return new IntegrationFailureRecorder(auditEventRepository, transactions, clock, ids, metrics);
     }
 
     @Bean
@@ -83,12 +95,13 @@ public class ApplicationConfiguration {
             CentralPortabilityPort centralPortabilityPort,
             BackoffPort backoffPort,
             TransactionPort transactions,
+            IntegrationFailureRecorder failureRecorder,
             Clock clock,
             IdGenerator ids,
             MetricsPort metrics
         ) {
         return new GetOperationStatusService(operationRepository, auditEventRepository,
-                centralPortabilityPort, backoffPort, transactions, clock, ids, metrics);
+                centralPortabilityPort, backoffPort, transactions, failureRecorder, clock, ids, metrics);
     }
 
     @Bean
@@ -97,12 +110,13 @@ public class ApplicationConfiguration {
             AuditEventRepository auditEventRepository,
             CentralPortabilityPort centralPortabilityPort,
             TransactionPort transactions,
+            IntegrationFailureRecorder failureRecorder,
             Clock clock,
             IdGenerator ids,
             MetricsPort metrics
         ) {
         return new UpdateReceivingAccountService(operationRepository, auditEventRepository,
-                centralPortabilityPort, transactions, clock, ids, metrics);
+                centralPortabilityPort, transactions, failureRecorder, clock, ids, metrics);
     }
 
     @Bean

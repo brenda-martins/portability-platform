@@ -54,7 +54,7 @@ mesmo padrão do registro (F03):
 
 ### Ports e modelo
 
-- `UpdateReceivingAccountUseCase.updateReceivingAccount(operationId, receivingAccount):
+- `UpdateReceivingAccountUseCase.updateReceivingAccount(OperationId, receivingAccount):
   Optional<PortabilityOperation>`; `Optional.empty()` significa operação inexistente.
 - `CentralPortabilityPort` mantém um único port para a integração com operações na Central, com o mesmo
   padrão de assinatura do registro.

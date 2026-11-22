@@ -8,25 +8,23 @@ import java.util.HexFormat;
 import java.util.List;
 
 public record PortabilityOperation(
-        String operationId,
-        String beneficiaryId,
+        OperationId operationId,
+        BeneficiaryId beneficiaryId,
         List<String> installmentIds,
         String creditorAssignee,
         ReceivingAccount receivingAccount,
         OperationStatus status,
-        String protocol,
+        Protocol protocol,
         String rejectionReason,
         Instant requestedAt,
         long version
 ) {
     public PortabilityOperation {
-        Validation.requireNotBlank(operationId, "operationId");
-        Validation.requireNotBlank(beneficiaryId, "beneficiaryId");
+        Validation.requireNonNull(operationId, "operationId");
+        Validation.requireNonNull(beneficiaryId, "beneficiaryId");
         Validation.requireNotBlank(creditorAssignee, "creditorAssignee");
         Validation.requireSelection(installmentIds);
-        if (receivingAccount == null) {
-            throw new InvalidRequestException("receivingAccount", "receivingAccount must not be null");
-        }
+        Validation.requireAccount(receivingAccount);
         if (status == null) {
             throw new InvalidRequestException("status", "status must not be null");
         }
@@ -39,11 +37,29 @@ public record PortabilityOperation(
         installmentIds = List.copyOf(installmentIds);
     }
 
-    public PortabilityOperation(String operationId, String beneficiaryId, List<String> installmentIds,
-            String creditorAssignee, ReceivingAccount receivingAccount, OperationStatus status,
-            String protocol, String rejectionReason, Instant requestedAt) {
-        this(operationId, beneficiaryId, installmentIds, creditorAssignee, receivingAccount,
-                status, protocol, rejectionReason, requestedAt, 0L);
+    public PortabilityOperation(
+        OperationId operationId, 
+        BeneficiaryId beneficiaryId,
+        List<String> installmentIds, 
+        String creditorAssignee, 
+        ReceivingAccount receivingAccount,
+        OperationStatus status, 
+        Protocol protocol, 
+        String rejectionReason, 
+        Instant requestedAt
+    ) {
+        this(
+            operationId, 
+            beneficiaryId, 
+            installmentIds, 
+            creditorAssignee, 
+            receivingAccount,
+            status, 
+            protocol, 
+            rejectionReason, 
+            requestedAt, 
+            0L
+        );
     }
 
     /** Only a pending operation may reach a terminal status, and only once. */
@@ -51,7 +67,7 @@ public record PortabilityOperation(
         if (status != OperationStatus.PENDING
                 || (newStatus != OperationStatus.CONFIRMED && newStatus != OperationStatus.REJECTED)) {
             throw new InvalidRequestException("status",
-                    "Transição de status inválida: " + status + " -> " + newStatus);
+                    "Invalid status transition: " + status + " -> " + newStatus);
         }
         String rejectionReason = newStatus == OperationStatus.REJECTED
                 ? Validation.requireNotBlank(reason, "rejectionReason") : null;
@@ -62,7 +78,7 @@ public record PortabilityOperation(
     /** The receiving account can be corrected only after confirmation. */
     public PortabilityOperation withReceivingAccount(ReceivingAccount account) {
         if (status != OperationStatus.CONFIRMED) {
-            throw new OperationNotConfirmedException("Somente operações confirmadas podem ter a conta alterada");
+            throw new OperationNotConfirmedException("Only confirmed operations may have the receiving account changed");
         }
         ReceivingAccount validated = Validation.requireAccount(account);
         if (receivingAccount.equals(validated)) {
@@ -73,23 +89,18 @@ public record PortabilityOperation(
     }
 
     public boolean isPending() {
-        return status == OperationStatus.PENDING && protocol != null && !protocol.isBlank();
+        return status == OperationStatus.PENDING && protocol != null;
     }
 
     /** Hash that recognises a resend of the same portability request. */
-    public static String idempotencyKey(
-        String beneficiaryId, 
-        List<String> installmentIds,
-        String creditorAssignee, 
-        ReceivingAccount account
-    ) {
+    public static String idempotencyKey(StartPortabilityCommand command) {
         String canonical = String.join("|",
-                Validation.requireNotBlank(beneficiaryId, "beneficiaryId"),
-                String.join(",", Validation.requireSelection(installmentIds).stream().sorted().toList()),
-                Validation.requireNotBlank(creditorAssignee, "creditorAssignee"),
-                Validation.requireAccount(account).bank(),
-                account.agency(),
-                account.account());
+                command.beneficiaryId().value(),
+                String.join(",", command.installmentIds().stream().sorted().toList()),
+                command.creditorAssignee(),
+                command.receivingAccount().bank(),
+                command.receivingAccount().agency(),
+                command.receivingAccount().account());
         try {
             byte[] digest = MessageDigest.getInstance("SHA-256")
                     .digest(canonical.getBytes(StandardCharsets.UTF_8));

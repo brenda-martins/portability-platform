@@ -3,8 +3,7 @@
 > **Dono:** detalhes de implementação (ports, mapeamentos, persistência, integração, erros e testes).
 > Visão geral em [`hld.md`](hld.md), contratos HTTP no README (seção "Documentação da API"), esquema
 > físico no README (seção "Modelo de dados"), convenções no [`../AGENTS.md`](../AGENTS.md) e termos no
-> [`../GLOSSARY.md`](../GLOSSARY.md). Quando uma tarefa alterar algo registrado aqui, carregue a skill
-> `lld` (se disponível) em modo atualizar antes de editar este arquivo.
+> [`../GLOSSARY.md`](../GLOSSARY.md).
 
 ## Modelo de domínio
 
@@ -12,14 +11,21 @@ Records imutáveis em `domain/model`, todos sem anotações de framework:
 
 | Tipo | Campos |
 | --- | --- |
-| `Authorization` | `authorizationId`, `beneficiaryId`, `agreementId`, `createdAt` |
+| `Authorization` | `authorizationId`, `beneficiaryId` (`BeneficiaryId`), `agreementId` (`AgreementId`), `createdAt` |
 | `AuthorizationResult` | `authorization`, `created` |
 | `PortabilityOperationResult` | `operation`, `created` |
-| `DiscountInstallment` | `installmentId`, `agreementId`, `amount` (`BigDecimal`), `discountDate` (`LocalDate`), `status` |
+| `DiscountInstallment` | `installmentId`, `agreementId` (`AgreementId`), `amount` (`BigDecimal`), `discountDate` (`LocalDate`), `status` |
 | `ReceivingAccount` | `bank`, `agency`, `account` |
-| `PortabilityOperation` | `operationId`, `beneficiaryId`, `installmentIds`, `creditorAssignee`, `receivingAccount`, `status`, `protocol`, `rejectionReason`, `requestedAt`, `version` |
-| `AuditEvent` | `eventId`, `operationId`, `eventType` (`String`), `message`, `occurredAt` |
+| `PortabilityOperation` | `operationId` (`OperationId`), `beneficiaryId` (`BeneficiaryId`), `installmentIds`, `creditorAssignee`, `receivingAccount`, `status`, `protocol` (`Protocol`), `rejectionReason`, `requestedAt`, `version` |
+| `AuditEvent` | `eventId`, `operationId` (`OperationId`), `eventType` (`String`), `message`, `occurredAt` |
 | `CentralOperationStatus` | `status`, `rejectionReason`, `retryAfter` (`Duration`) |
+| `BeneficiaryId`, `AgreementId`, `OperationId`, `Protocol` | value objects com um campo `value` (`String`), validados por `Validation` |
+| `StartPortabilityCommand` | `beneficiaryId` (`BeneficiaryId`), `installmentIds`, `creditorAssignee`, `receivingAccount` |
+
+Os value objects de ID são usados no domínio e nas portas; adapters os convertem explicitamente para
+`String` em JSON, colunas e chamadas à Central. Contrato HTTP e schema permanecem com `String`.
+`StartPortabilityCommand` agrupa os dados que sempre viajam juntos no registro e no cálculo da chave de
+idempotência.
 
 `Validation` é a dona das invariantes de entrada; os records chamam-no no construtor e os DTOs de entrada
 da web chamam `validate()` antes de invocar o caso de uso. `PortabilityOperation.transitionTo` só permite
@@ -43,12 +49,12 @@ derivam de `DomainException`.
 
 | Port | Método |
 | --- | --- |
-| `RegisterAuthorizationUseCase` | `registerAuthorization(beneficiaryId, agreementId): AuthorizationResult` |
-| `GetDiscountAgendaUseCase` | `getAgenda(beneficiaryId): List<DiscountInstallment>` |
-| `StartPortabilityUseCase` | `startPortability(beneficiaryId, installmentIds, creditorAssignee, receivingAccount): PortabilityOperationResult` |
-| `GetOperationStatusUseCase` | `getOperationStatus(operationId): Optional<PortabilityOperation>` (acompanha a Central quando `PENDING`) |
-| `UpdateReceivingAccountUseCase` | `updateReceivingAccount(operationId, receivingAccount): Optional<PortabilityOperation>` |
-| `GetOperationAuditUseCase` | `getAuditTrail(operationId): Optional<List<AuditEvent>>` (vazio quando a operação não existe) |
+| `RegisterAuthorizationUseCase` | `registerAuthorization(BeneficiaryId, AgreementId): AuthorizationResult` |
+| `GetDiscountAgendaUseCase` | `getAgenda(BeneficiaryId): List<DiscountInstallment>` |
+| `StartPortabilityUseCase` | `startPortability(StartPortabilityCommand): PortabilityOperationResult` |
+| `GetOperationStatusUseCase` | `getOperationStatus(OperationId): Optional<PortabilityOperation>` (acompanha a Central quando `PENDING`) |
+| `UpdateReceivingAccountUseCase` | `updateReceivingAccount(OperationId, ReceivingAccount): Optional<PortabilityOperation>` |
+| `GetOperationAuditUseCase` | `getAuditTrail(OperationId): Optional<List<AuditEvent>>` (vazio quando a operação não existe) |
 
 ### Saída (`domain/ports/out`)
 
@@ -64,6 +70,14 @@ derivam de `DomainException`.
 | `TransactionPort` | `TransactionalAdapter` | demarcar unidade de trabalho sem expor Spring à aplicação |
 | `MetricsPort` | `LoggingMetricsAdapter` | contar desfechos nos seams, via log (sem dependência nova) |
 | `BackoffPort` | `ThreadBackoffAdapter` | aplicar a espera entre tentativas de consulta de status |
+
+As portas de saída usam os mesmos value objects: `OperationRepository.findById(OperationId)`,
+`AuditEventRepository.findByOperationId(OperationId)`,
+`AuthorizationRepository.findByBeneficiaryAndAgreement(BeneficiaryId, AgreementId)`,
+`existsByBeneficiaryId(BeneficiaryId)`, `DiscountAgendaPort.fetchAgenda(BeneficiaryId)`,
+`CentralAuthorizationPort.registerAuthorization(BeneficiaryId, AgreementId)`,
+`CentralPortabilityPort.registerPortability(StartPortabilityCommand): Protocol`,
+`consultStatus(Protocol)` e `updateReceivingAccount(Protocol, ReceivingAccount)`.
 
 Assinatura HMAC e montagem do corpo canônico ficam em `CentralRequestCodec` (adapter), usado tanto por
 `CentralClient` quanto pelo mock; não há `SignaturePort`. A aplicação é dividida em um serviço por port
@@ -158,9 +172,9 @@ A tradução acontece em `adapters/out/central`:
   determinístico por payload. Na API, falha de integração vira `502`.
 - `HmacSignatureService`: HMAC-SHA256 em Base64 com segredo de `central.hmac-secret`; verificação em
   tempo constante.
-- Registro: antes de qualquer chamada à Central, `startPortability` calcula a chave SHA-256 em hex de
-  `beneficiaryId|parcelas ordenadas|credor|banco|agência|conta`, consulta `findByIdempotencyKey` e reserva
-  a chave. Se a operação existir, devolve-a com `created = false` (`200`); se a reserva conflitar com uma
+- Registro: antes de qualquer chamada à Central, `startPortability` recebe um `StartPortabilityCommand`,
+  calcula a chave SHA-256 em hex de `beneficiaryId|parcelas ordenadas|credor|banco|agência|conta` por
+  `PortabilityOperation.idempotencyKey(command)`, consulta `findByIdempotencyKey` e reserva a chave. Se a operação existir, devolve-a com `created = false` (`200`); se a reserva conflitar com uma
   transação já confirmada, nova transação lê a operação existente e também devolve `200`. A reserva é
   desfeita junto com a transação quando a chamada à Central falha. Caso contrário, exige autorização do
   beneficiário (`403`), reconsulta a agenda e só aceita parcelas existentes, `OPEN` e com data futura,
@@ -174,7 +188,10 @@ A tradução acontece em `adapters/out/central`:
   Respostas de sucesso usam DTOs explícitos, sem a `version` do agregado. Quando a operação já existe, a
   aplicação anexa `FALHA_INTEGRACAO` com o ID da operação e o contexto da chamada ao redor de
   `consultStatus` e `updateReceivingAccount`, propaga a exceção e não altera status, motivo nem conta.
-  Falhas no opt-in, na agenda ou no registro não geram evento órfão.
+  `IntegrationFailureRecorder` concentra o anexo do evento, a contagem e a transação; a transição final
+  deriva evento e mensagem de um único mapeamento do status recebido da Central. Falhas no opt-in, na
+  agenda ou no registro não geram evento órfão. O formato e o idioma dessas mensagens são contrato da
+  API da aplicação, documentado em [`../README.md`](../README.md), seção "Documentação da API".
 - Transições de `OperationStatus` (`CONFIRMED`/`REJECTED`) e seus eventos são F04. A conta de recebimento
   pode ser corrigida somente em operações `CONFIRMED` (F05): a aplicação envia `PUT` assinado à Central com
   `protocolo`, `banco`, `agencia` e `conta`, persiste a nova conta e anexa `CONTA_ATUALIZADA` somente quando

@@ -16,7 +16,7 @@ public record InstallmentResponse(
     public static InstallmentResponse from(DiscountInstallment installment) {
         return new InstallmentResponse(
                 installment.installmentId(),
-                installment.agreementId(),
+                installment.agreementId().value(),
                 installment.amount(),
                 installment.discountDate(),
                 installment.status());

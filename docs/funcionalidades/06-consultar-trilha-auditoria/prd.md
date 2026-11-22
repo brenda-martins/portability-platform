@@ -1,8 +1,8 @@
 # PRD — F06 Consultar a trilha de auditoria de cada operação
 
 > **Dono:** requisitos de produto desta funcionalidade. Escopo, fases e métricas em
-> [`../../product-brief.md`](../../product-brief.md); termos em [`../../GLOSSARY.md`](../../GLOSSARY.md);
-> status em [`../../roadmap.md`](../../roadmap.md). Spec de origem: PDF do desafio, disponível fora do
+> [`../../product-brief.md`](../../product-brief.md); termos em [`../../GLOSSARY.md`](../../GLOSSARY.md).
+> Spec de origem: PDF do desafio, disponível fora do
 > repositório; ele pede o painel com a trilha de eventos por operação, sem fixar contrato HTTP.
 
 ## Problema

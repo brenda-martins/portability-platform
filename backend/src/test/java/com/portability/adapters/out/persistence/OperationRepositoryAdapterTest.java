@@ -1,8 +1,11 @@
 package com.portability.adapters.out.persistence;
 
+import com.portability.domain.model.BeneficiaryId;
 import com.portability.domain.model.ConcurrentOperationException;
+import com.portability.domain.model.OperationId;
 import com.portability.domain.model.OperationStatus;
 import com.portability.domain.model.PortabilityOperation;
+import com.portability.domain.model.Protocol;
 import com.portability.domain.model.ReceivingAccount;
 import com.portability.domain.ports.out.OperationRepository;
 import org.junit.jupiter.api.Test;
@@ -60,10 +63,10 @@ class OperationRepositoryAdapterTest {
     void shouldFindOperationById() {
         repository.save(operation(), IDEMPOTENCY_KEY);
 
-        Optional<PortabilityOperation> byId = repository.findById("OPE-1");
+        Optional<PortabilityOperation> byId = repository.findById(new OperationId("OPE-1"));
 
         assertTrue(byId.isPresent());
-        assertEquals("OPE-1", byId.get().operationId());
+        assertEquals(new OperationId("OPE-1"), byId.get().operationId());
         assertEquals(List.of("INS-1", "INS-2"), byId.get().installmentIds());
     }
 
@@ -89,7 +92,7 @@ class OperationRepositoryAdapterTest {
         repository.save(saved.transitionTo(OperationStatus.CONFIRMED, null));
 
         assertThrows(ConcurrentOperationException.class,
-                () -> repository.save(saved.transitionTo(OperationStatus.REJECTED, "Convênio bloqueado")));
+                () -> repository.save(saved.transitionTo(OperationStatus.REJECTED, "Agreement blocked")));
     }
 
     @Test
@@ -102,9 +105,10 @@ class OperationRepositoryAdapterTest {
     }
 
     private static PortabilityOperation operation() {
-        return new PortabilityOperation("OPE-1", "BEN-123", List.of("INS-1", "INS-2"),
-                "Nova Credora S.A.", new ReceivingAccount("001", "1234", "56789-0"),
-                OperationStatus.PENDING, "PRT-1", null,
-                Instant.parse("2026-11-22T12:34:56Z"));
+        return new PortabilityOperation(new OperationId("OPE-1"), new BeneficiaryId("BEN-123"),
+                List.of("INS-1", "INS-2"), "Nova Credora S.A.",
+                new ReceivingAccount("001", "1234", "56789-0"),
+                OperationStatus.PENDING, new Protocol("PRT-1"), null,
+                Instant.parse("2026-11-22T12:34:56Z"), 0L);
     }
 }

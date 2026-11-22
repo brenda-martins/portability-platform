@@ -1,8 +1,11 @@
 package com.portability.adapters.in.web;
 
 import com.portability.adapters.out.persistence.SpringDataOperationRepository;
+import com.portability.domain.model.BeneficiaryId;
+import com.portability.domain.model.OperationId;
 import com.portability.domain.model.OperationStatus;
 import com.portability.domain.model.PortabilityOperation;
+import com.portability.domain.model.Protocol;
 import com.portability.domain.model.ReceivingAccount;
 import com.portability.domain.ports.out.OperationRepository;
 import org.junit.jupiter.api.AfterEach;
@@ -53,9 +56,9 @@ class GetOperationStatusIntegrationTest {
     @Test
     void shouldReturnOperationWhenReadOutsideTransaction() throws Exception {
         repository.save(new PortabilityOperation(
-                OPERATION_ID, "BEN-123", List.of("INS-1", "INS-2"),
+                new OperationId(OPERATION_ID), new BeneficiaryId("BEN-123"), List.of("INS-1", "INS-2"),
                 "Nova Credora S.A.", new ReceivingAccount("001", "1234", "56789-0"),
-                OperationStatus.CONFIRMED, "PRT-1", null,
+                OperationStatus.CONFIRMED, new Protocol("PRT-1"), null,
                 Instant.parse("2026-11-22T12:34:56Z")), "key-lazy-1");
 
         mockMvc.perform(get("/api/portability/{operationId}", OPERATION_ID))

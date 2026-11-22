@@ -5,10 +5,11 @@ import com.portability.domain.model.AuditEventType;
 import com.portability.domain.model.BeneficiaryNotAuthorizedException;
 import com.portability.domain.model.ConcurrentOperationException;
 import com.portability.domain.model.DuplicateIdempotencyKeyException;
+import com.portability.domain.model.OperationId;
 import com.portability.domain.model.OperationStatus;
 import com.portability.domain.model.PortabilityOperation;
 import com.portability.domain.model.PortabilityOperationResult;
-import com.portability.domain.model.ReceivingAccount;
+import com.portability.domain.model.StartPortabilityCommand;
 import com.portability.domain.model.Validation;
 import com.portability.domain.ports.in.StartPortabilityUseCase;
 import com.portability.domain.ports.out.AuditEventRepository;
@@ -23,7 +24,6 @@ import com.portability.domain.ports.out.TransactionPort;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.util.List;
 import java.util.Optional;
 
 public class StartPortabilityService implements StartPortabilityUseCase {
@@ -40,13 +40,13 @@ public class StartPortabilityService implements StartPortabilityUseCase {
 
     public StartPortabilityService(
         final OperationRepository operationRepository,
-        final AuthorizationRepository authorizationRepository, 
+        final AuthorizationRepository authorizationRepository,
         final AuditEventRepository auditEventRepository,
-        final DiscountAgendaPort discountAgendaPort, 
+        final DiscountAgendaPort discountAgendaPort,
         final CentralPortabilityPort centralPortabilityPort,
-        final TransactionPort transactions, 
-        final Clock clock, 
-        final IdGenerator ids, 
+        final TransactionPort transactions,
+        final Clock clock,
+        final IdGenerator ids,
         final MetricsPort metrics
     ) {
         this.operationRepository = operationRepository;
@@ -61,23 +61,8 @@ public class StartPortabilityService implements StartPortabilityUseCase {
     }
 
     @Override
-    public PortabilityOperationResult startPortability(
-        String beneficiaryId, 
-        List<String> installmentIds,
-        String creditorAssignee, 
-        ReceivingAccount receivingAccount
-    ) {
-        Validation.requireNotBlank(beneficiaryId, "beneficiaryId");
-        Validation.requireNotBlank(creditorAssignee, "creditorAssignee");
-        Validation.requireAccount(receivingAccount);
-        
-        List<String> selection = Validation.requireSelection(installmentIds);
-        String idempotencyKey = PortabilityOperation.idempotencyKey(
-                beneficiaryId, 
-                selection, 
-                creditorAssignee, 
-                receivingAccount
-            );
+    public PortabilityOperationResult startPortability(StartPortabilityCommand command) {
+        String idempotencyKey = PortabilityOperation.idempotencyKey(command);
 
         try {
             return transactions.inTransaction(() -> {
@@ -87,30 +72,25 @@ public class StartPortabilityService implements StartPortabilityUseCase {
                 }
                 operationRepository.reserveIdempotencyKey(idempotencyKey);
 
-                if (!authorizationRepository.existsByBeneficiaryId(beneficiaryId)) {
+                if (!authorizationRepository.existsByBeneficiaryId(command.beneficiaryId())) {
                     throw new BeneficiaryNotAuthorizedException("Beneficiary not authorized");
                 }
 
                 Validation.requireEligibleInstallments(
-                        selection,
-                        discountAgendaPort.fetchAgenda(beneficiaryId),
+                        command.installmentIds(),
+                        discountAgendaPort.fetchAgenda(command.beneficiaryId()),
                         LocalDate.now(clock)
                     );
 
-                String protocol = centralPortabilityPort.registerPortability(
-                        beneficiaryId,
-                        selection,
-                        creditorAssignee,
-                        receivingAccount
-                    );
+                var protocol = centralPortabilityPort.registerPortability(command);
                 Instant requestedAt = Instant.now(clock);
 
                 PortabilityOperation operation = new PortabilityOperation(
-                        ids.next(),
-                        beneficiaryId,
-                        selection,
-                        creditorAssignee,
-                        receivingAccount,
+                        new OperationId(ids.next()),
+                        command.beneficiaryId(),
+                        command.installmentIds(),
+                        command.creditorAssignee(),
+                        command.receivingAccount(),
                         OperationStatus.PENDING,
                         protocol,
                         null,
@@ -123,7 +103,7 @@ public class StartPortabilityService implements StartPortabilityUseCase {
                         ids.next(),
                         saved.operationId(),
                         AuditEventType.REQUESTED,
-                        "Operação solicitada com protocolo " + protocol,
+                        "Operation requested with protocol " + protocol.value(),
                         requestedAt
                     ));
                 metrics.increment("portability.created");

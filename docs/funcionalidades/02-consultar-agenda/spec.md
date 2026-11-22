@@ -17,7 +17,7 @@ erros, correlation id, métricas e assemblagem dos serviços — estão em [`../
 | Método | Rota | Situação | Resposta |
 | --- | --- | --- | --- |
 | `GET` | `/api/beneficiaries/{beneficiaryId}/agenda` | beneficiário autorizado | `200` com `DiscountInstallment[]` |
-| `GET` | `/api/beneficiaries/{beneficiaryId}/agenda` | sem autorização | `403` com `{ "message": "Beneficiário não autorizado" }` |
+| `GET` | `/api/beneficiaries/{beneficiaryId}/agenda` | sem autorização | `403` com `{ "message": "Beneficiary not authorized" }` |
 | `GET` | `/api/beneficiaries/{beneficiaryId}/agenda` | `beneficiaryId` em branco | `400` com `{ "message": "...", "fields": {...} }` |
 | `GET` | `/api/beneficiaries/{beneficiaryId}/agenda` | falha na Central | `502` com `{ "message": "..." }` |
 
@@ -58,10 +58,10 @@ conforme [`../../lld.md`](../../lld.md).
 
 ### Ports e modelo
 
-- `AuthorizationRepository.existsByBeneficiaryId(String beneficiaryId): boolean` responde se há ao menos
-  uma autorização do beneficiário, sem exigir convênio.
-- `GetDiscountAgendaUseCase.getAgenda` e `DiscountAgendaPort.fetchAgenda` mantêm as assinaturas atuais;
-  `GetDiscountAgendaService` implementa o caso de uso.
+- `AuthorizationRepository.existsByBeneficiaryId(BeneficiaryId): boolean` responde se há ao menos uma
+  autorização do beneficiário, sem exigir convênio.
+- `GetDiscountAgendaUseCase.getAgenda(BeneficiaryId)` e `DiscountAgendaPort.fetchAgenda(BeneficiaryId)`
+  usam o value object; `GetDiscountAgendaService` implementa o caso de uso.
 - `BeneficiaryNotAuthorizedException` (domínio, sem framework) representa a violação da regra de
   autorização; a borda HTTP a traduz em `403`.
 - `DiscountInstallment` rejeita identificadores em branco e campos obrigatórios nulos no construtor,

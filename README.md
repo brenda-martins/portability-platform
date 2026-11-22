@@ -140,7 +140,6 @@ Linguagem visual: [`docs/design-system.md`](docs/design-system.md). Práticas de
 
 ## Planejamento
 
-Funcionalidades, dependências, status e próximas ações: [`docs/roadmap.md`](docs/roadmap.md).
 Estrutura de PRD, spec, tarefas e planos: [`docs/funcionalidades/README.md`](docs/funcionalidades/README.md).
 Processo de SDD: [`AGENTS.md`](AGENTS.md), seção "Processo obrigatório de SDD".
 
@@ -185,6 +184,8 @@ operação não confirmada, versão desatualizada ou par beneficiário+convênio
 Central. O frontend gera e envia `X-Correlation-Id` em toda chamada e exibe o `correlationId` recebido
 na mensagem de erro. O registro reserva a chave de idempotência antes de chamar a Central: reenvios
 concorrentes da mesma solicitação devolvem `200` com a operação existente, sem gerar novo protocolo.
+Mensagens de erro e mensagens de eventos de auditoria da API da aplicação são em inglês; os valores de
+`eventType` e os payloads da Central permanecem em pt-BR, conforme o PDF imutável.
 
 ### Central de Convênios simulada (`/central`)
 
@@ -260,7 +261,7 @@ Payloads da Central:
 // GET /api/portability/OPE-1/audit
 [
   { "eventId": "EVT-1", "operationId": "OPE-1", "eventType": "SOLICITADA",
-    "message": "Operação solicitada com protocolo PRT-1", "occurredAt": "2026-11-22T12:34:56Z" }
+    "message": "Operation requested with protocol PRT-1", "occurredAt": "2026-11-22T12:34:56Z" }
 ]
 ```
 
@@ -325,5 +326,5 @@ Eventos são gravados por `append` e devem ser **append-only**: nunca atualizado
 ---
 
 > **Manutenção:** atualize este README somente quando mudarem execução, contratos da API, modelo de
-> dados ou versões das tecnologias. Funcionalidades e status ficam em
-> [`docs/roadmap.md`](docs/roadmap.md).
+> dados ou versões das tecnologias. Funcionalidades e planos ficam em
+> [`docs/funcionalidades/README.md`](docs/funcionalidades/README.md).

@@ -13,8 +13,8 @@ public record AuthorizationResponse(
     public static AuthorizationResponse from(Authorization authorization) {
         return new AuthorizationResponse(
                 authorization.authorizationId(),
-                authorization.beneficiaryId(),
-                authorization.agreementId(),
+                authorization.beneficiaryId().value(),
+                authorization.agreementId().value(),
                 authorization.createdAt());
     }
 }

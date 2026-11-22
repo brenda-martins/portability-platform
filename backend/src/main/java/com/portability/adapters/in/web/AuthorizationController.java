@@ -2,7 +2,9 @@ package com.portability.adapters.in.web;
 
 import com.portability.adapters.in.web.input.AuthorizeRequest;
 import com.portability.adapters.in.web.output.AuthorizationResponse;
+import com.portability.domain.model.AgreementId;
 import com.portability.domain.model.AuthorizationResult;
+import com.portability.domain.model.BeneficiaryId;
 import com.portability.domain.ports.in.RegisterAuthorizationUseCase;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -25,8 +27,8 @@ public class AuthorizationController {
     public ResponseEntity<AuthorizationResponse> register(@RequestBody AuthorizeRequest request) {
         request.validate();
         AuthorizationResult result = registerAuthorizationUseCase.registerAuthorization(
-                request.beneficiaryId(), 
-                request.agreementId()
+                new BeneficiaryId(request.beneficiaryId()),
+                new AgreementId(request.agreementId())
         );
         HttpStatus status = result.created() ? HttpStatus.CREATED : HttpStatus.OK;
         return ResponseEntity.status(status).body(AuthorizationResponse.from(result.authorization()));

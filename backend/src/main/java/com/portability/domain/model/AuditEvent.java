@@ -4,14 +4,14 @@ import java.time.Instant;
 
 public record AuditEvent(
         String eventId,
-        String operationId,
+        OperationId operationId,
         String eventType,
         String message,
         Instant occurredAt
 ) {
     public AuditEvent {
         Validation.requireNotBlank(eventId, "eventId");
-        Validation.requireNotBlank(operationId, "operationId");
+        Validation.requireNonNull(operationId, "operationId");
         Validation.requireNotBlank(eventType, "eventType");
         if (occurredAt == null) {
             throw new InvalidRequestException("occurredAt", "occurredAt must not be null");
@@ -19,10 +19,10 @@ public record AuditEvent(
     }
 
     public AuditEvent(
-        String eventId, 
-        String operationId, 
+        String eventId,
+        OperationId operationId,
         AuditEventType type,
-        String message, 
+        String message,
         Instant occurredAt
     ) {
         this(eventId, operationId, type.externalValue(), message, occurredAt);

@@ -1,13 +1,18 @@
 package com.portability.application;
 
 import com.portability.adapters.out.persistence.SpringDataOperationRepository;
+import com.portability.domain.model.AgreementId;
 import com.portability.domain.model.AuditEvent;
+import com.portability.domain.model.BeneficiaryId;
 import com.portability.domain.model.ConcurrentOperationException;
 import com.portability.domain.model.DiscountInstallment;
 import com.portability.domain.model.InstallmentStatus;
+import com.portability.domain.model.OperationId;
 import com.portability.domain.model.OperationStatus;
 import com.portability.domain.model.PortabilityOperation;
+import com.portability.domain.model.Protocol;
 import com.portability.domain.model.ReceivingAccount;
+import com.portability.domain.model.StartPortabilityCommand;
 import com.portability.domain.ports.in.StartPortabilityUseCase;
 import com.portability.domain.ports.out.AuditEventRepository;
 import com.portability.domain.ports.out.AuthorizationRepository;
@@ -30,8 +35,6 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyList;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 
 @SpringBootTest
@@ -71,18 +74,17 @@ class OperationTransactionalTest {
 
     @Test
     void mustRollbackOperationWhenAuditAppendFails() {
-        when(authorizationRepository.existsByBeneficiaryId(BENEFICIARY_ID)).thenReturn(true);
-        when(((DiscountAgendaPort) centralPortabilityPort).fetchAgenda(BENEFICIARY_ID))
-                .thenReturn(List.of(new DiscountInstallment(INSTALLMENT_ID, AGREEMENT_ID,
+        when(authorizationRepository.existsByBeneficiaryId(new BeneficiaryId(BENEFICIARY_ID))).thenReturn(true);
+        when(((DiscountAgendaPort) centralPortabilityPort).fetchAgenda(new BeneficiaryId(BENEFICIARY_ID)))
+                .thenReturn(List.of(new DiscountInstallment(INSTALLMENT_ID, new AgreementId(AGREEMENT_ID),
                         new BigDecimal("120.50"), LocalDate.now().plusDays(10), InstallmentStatus.OPEN)));
-        when(centralPortabilityPort.registerPortability(anyString(), anyList(), anyString(), any()))
-                .thenReturn(PROTOCOL);
+        when(centralPortabilityPort.registerPortability(any(StartPortabilityCommand.class)))
+                .thenReturn(new Protocol(PROTOCOL));
         when(auditEventRepository.append(any(AuditEvent.class)))
                 .thenThrow(new IllegalStateException("audit unavailable"));
 
-        assertThrows(IllegalStateException.class, () -> startPortabilityUseCase.startPortability(
-                BENEFICIARY_ID, List.of(INSTALLMENT_ID), "Nova Credora S.A.",
-                new ReceivingAccount("001", "1234", "56789-0")));
+        assertThrows(IllegalStateException.class,
+                () -> startPortabilityUseCase.startPortability(command()));
 
         assertEquals(0, springOperations.count());
     }
@@ -91,19 +93,25 @@ class OperationTransactionalTest {
     void mustRejectStaleUpdateWithOptimisticLock() {
         PortabilityOperation saved = operationRepository.save(pendingOperation(), KEY);
         PortabilityOperation current = saved.transitionTo(OperationStatus.CONFIRMED, null);
-        PortabilityOperation stale = saved.transitionTo(OperationStatus.REJECTED, "Convênio bloqueado");
+        PortabilityOperation stale = saved.transitionTo(OperationStatus.REJECTED, "Agreement blocked");
 
         operationRepository.save(current);
 
         assertThrows(ConcurrentOperationException.class, () -> operationRepository.save(stale));
         assertEquals(OperationStatus.CONFIRMED,
-                operationRepository.findById(OPERATION_ID).orElseThrow().status());
+                operationRepository.findById(new OperationId(OPERATION_ID)).orElseThrow().status());
+    }
+
+    private static StartPortabilityCommand command() {
+        return new StartPortabilityCommand(new BeneficiaryId(BENEFICIARY_ID), List.of(INSTALLMENT_ID),
+                "Nova Credora S.A.", new ReceivingAccount("001", "1234", "56789-0"));
     }
 
     private static PortabilityOperation pendingOperation() {
         return new PortabilityOperation(
-                OPERATION_ID, BENEFICIARY_ID, List.of(INSTALLMENT_ID), "Nova Credora S.A.",
-                new ReceivingAccount("001", "1234", "56789-0"), OperationStatus.PENDING, PROTOCOL, null,
+                new OperationId(OPERATION_ID), new BeneficiaryId(BENEFICIARY_ID), List.of(INSTALLMENT_ID),
+                "Nova Credora S.A.", new ReceivingAccount("001", "1234", "56789-0"),
+                OperationStatus.PENDING, new Protocol(PROTOCOL), null,
                 Instant.parse("2026-11-22T12:34:56Z"));
     }
 }

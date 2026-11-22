@@ -1,11 +1,15 @@
 package com.portability.adapters.in.web;
 
+import com.portability.domain.model.BeneficiaryId;
 import com.portability.domain.model.BeneficiaryNotAuthorizedException;
+import com.portability.domain.model.OperationId;
 import com.portability.domain.model.OperationNotConfirmedException;
 import com.portability.domain.model.OperationStatus;
 import com.portability.domain.model.PortabilityOperation;
 import com.portability.domain.model.PortabilityOperationResult;
+import com.portability.domain.model.Protocol;
 import com.portability.domain.model.ReceivingAccount;
+import com.portability.domain.model.StartPortabilityCommand;
 import com.portability.domain.ports.in.GetOperationStatusUseCase;
 import com.portability.domain.ports.in.StartPortabilityUseCase;
 import com.portability.domain.ports.in.UpdateReceivingAccountUseCase;
@@ -62,8 +66,7 @@ class PortabilityControllerContractTest {
 
     @Test
     void shouldRespond201WithOperationWhenRequestIsNew() throws Exception {
-        when(startPortabilityUseCase.startPortability("BEN-123", List.of("INS-1"),
-                "Nova Credora S.A.", new ReceivingAccount("001", "1234", "56789-0")))
+        when(startPortabilityUseCase.startPortability(command()))
                 .thenReturn(new PortabilityOperationResult(operation(), true));
 
         mockMvc.perform(post("/api/portability")
@@ -78,8 +81,7 @@ class PortabilityControllerContractTest {
 
     @Test
     void shouldRespond200WithExistingOperationWhenResent() throws Exception {
-        when(startPortabilityUseCase.startPortability("BEN-123", List.of("INS-1"),
-                "Nova Credora S.A.", new ReceivingAccount("001", "1234", "56789-0")))
+        when(startPortabilityUseCase.startPortability(command()))
                 .thenReturn(new PortabilityOperationResult(operation(), false));
 
         mockMvc.perform(post("/api/portability")
@@ -124,33 +126,31 @@ class PortabilityControllerContractTest {
 
     @Test
     void mustRespond403WhenBeneficiaryIsNotAuthorized() throws Exception {
-        when(startPortabilityUseCase.startPortability("BEN-123", List.of("INS-1"),
-                "Nova Credora S.A.", new ReceivingAccount("001", "1234", "56789-0")))
-                .thenThrow(new BeneficiaryNotAuthorizedException("Beneficiário não autorizado"));
+        when(startPortabilityUseCase.startPortability(command()))
+                .thenThrow(new BeneficiaryNotAuthorizedException("Beneficiary not authorized"));
 
         mockMvc.perform(post("/api/portability")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(VALID_BODY))
                 .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.message").value("Beneficiário não autorizado"));
+                .andExpect(jsonPath("$.message").value("Beneficiary not authorized"));
     }
 
     @Test
     void mustRespond502WhenCentralFails() throws Exception {
-        when(startPortabilityUseCase.startPortability("BEN-123", List.of("INS-1"),
-                "Nova Credora S.A.", new ReceivingAccount("001", "1234", "56789-0")))
-                .thenThrow(new CentralUnavailableException("Central indisponível"));
+        when(startPortabilityUseCase.startPortability(command()))
+                .thenThrow(new CentralUnavailableException("Central unavailable"));
 
         mockMvc.perform(post("/api/portability")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(VALID_BODY))
                 .andExpect(status().isBadGateway())
-                .andExpect(jsonPath("$.message").value("Central indisponível"));
+                .andExpect(jsonPath("$.message").value("Central unavailable"));
     }
 
     @Test
     void shouldRespond200WithOperationWhenStatusIsConsulted() throws Exception {
-        when(getOperationStatusUseCase.getOperationStatus("OPE-1")).thenReturn(Optional.of(operation()));
+        when(getOperationStatusUseCase.getOperationStatus(new OperationId("OPE-1"))).thenReturn(Optional.of(operation()));
 
         mockMvc.perform(get("/api/portability/OPE-1"))
                 .andExpect(status().isOk())
@@ -160,7 +160,7 @@ class PortabilityControllerContractTest {
 
     @Test
     void shouldRespond404WhenOperationDoesNotExist() throws Exception {
-        when(getOperationStatusUseCase.getOperationStatus("missing")).thenReturn(Optional.empty());
+        when(getOperationStatusUseCase.getOperationStatus(new OperationId("missing"))).thenReturn(Optional.empty());
 
         mockMvc.perform(get("/api/portability/missing"))
                 .andExpect(status().isNotFound());
@@ -168,18 +168,18 @@ class PortabilityControllerContractTest {
 
     @Test
     void mustRespond502WhenCentralFailsDuringStatusConsultation() throws Exception {
-        when(getOperationStatusUseCase.getOperationStatus("OPE-1"))
-                .thenThrow(new CentralUnavailableException("Central indisponível"));
+        when(getOperationStatusUseCase.getOperationStatus(new OperationId("OPE-1")))
+                .thenThrow(new CentralUnavailableException("Central unavailable"));
 
         mockMvc.perform(get("/api/portability/OPE-1"))
                 .andExpect(status().isBadGateway())
-                .andExpect(jsonPath("$.message").value("Central indisponível"));
+                .andExpect(jsonPath("$.message").value("Central unavailable"));
     }
 
     @Test
     void mustRespond409WhenConcurrentUpdateWins() throws Exception {
-        when(getOperationStatusUseCase.getOperationStatus("OPE-1"))
-                .thenThrow(new OptimisticLockingFailureException("versão desatualizada"));
+        when(getOperationStatusUseCase.getOperationStatus(new OperationId("OPE-1")))
+                .thenThrow(new OptimisticLockingFailureException("stale version"));
 
         mockMvc.perform(get("/api/portability/OPE-1"))
                 .andExpect(status().isConflict());
@@ -188,10 +188,11 @@ class PortabilityControllerContractTest {
     @Test
     void shouldRespond200WithUpdatedAccountWhenOperationIsConfirmed() throws Exception {
         ReceivingAccount newAccount = new ReceivingAccount("002", "4321", "98765-4");
-        PortabilityOperation updated = new PortabilityOperation("OPE-1", "BEN-123", List.of("INS-1"),
-                "Nova Credora S.A.", newAccount, OperationStatus.CONFIRMED, "PRT-1", null,
+        PortabilityOperation updated = new PortabilityOperation(new OperationId("OPE-1"),
+                new BeneficiaryId("BEN-123"), List.of("INS-1"), "Nova Credora S.A.", newAccount,
+                OperationStatus.CONFIRMED, new Protocol("PRT-1"), null,
                 Instant.parse("2026-11-22T12:34:56Z"));
-        when(updateReceivingAccountUseCase.updateReceivingAccount("OPE-1", newAccount))
+        when(updateReceivingAccountUseCase.updateReceivingAccount(new OperationId("OPE-1"), newAccount))
                 .thenReturn(Optional.of(updated));
 
         mockMvc.perform(put("/api/portability/OPE-1/receiving-account")
@@ -217,7 +218,7 @@ class PortabilityControllerContractTest {
 
     @Test
     void shouldRespond404WhenOperationToUpdateDoesNotExist() throws Exception {
-        when(updateReceivingAccountUseCase.updateReceivingAccount("missing",
+        when(updateReceivingAccountUseCase.updateReceivingAccount(new OperationId("missing"),
                 new ReceivingAccount("002", "4321", "98765-4"))).thenReturn(Optional.empty());
 
         mockMvc.perform(put("/api/portability/missing/receiving-account")
@@ -228,36 +229,41 @@ class PortabilityControllerContractTest {
 
     @Test
     void mustRespond409WhenOperationIsNotConfirmed() throws Exception {
-        when(updateReceivingAccountUseCase.updateReceivingAccount("OPE-1",
+        when(updateReceivingAccountUseCase.updateReceivingAccount(new OperationId("OPE-1"),
                 new ReceivingAccount("002", "4321", "98765-4")))
                 .thenThrow(new OperationNotConfirmedException(
-                        "Somente operações confirmadas podem ter a conta alterada"));
+                        "Only confirmed operations may have the receiving account changed"));
 
         mockMvc.perform(put("/api/portability/OPE-1/receiving-account")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(ACCOUNT_BODY))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.message")
-                        .value("Somente operações confirmadas podem ter a conta alterada"));
+                        .value("Only confirmed operations may have the receiving account changed"));
     }
 
     @Test
     void mustRespond502WhenCentralFailsDuringAccountUpdate() throws Exception {
-        when(updateReceivingAccountUseCase.updateReceivingAccount("OPE-1",
+        when(updateReceivingAccountUseCase.updateReceivingAccount(new OperationId("OPE-1"),
                 new ReceivingAccount("002", "4321", "98765-4")))
-                .thenThrow(new CentralUnavailableException("Central indisponível"));
+                .thenThrow(new CentralUnavailableException("Central unavailable"));
 
         mockMvc.perform(put("/api/portability/OPE-1/receiving-account")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(ACCOUNT_BODY))
                 .andExpect(status().isBadGateway())
-                .andExpect(jsonPath("$.message").value("Central indisponível"));
+                .andExpect(jsonPath("$.message").value("Central unavailable"));
+    }
+
+    private static StartPortabilityCommand command() {
+        return new StartPortabilityCommand(new BeneficiaryId("BEN-123"), List.of("INS-1"),
+                "Nova Credora S.A.", new ReceivingAccount("001", "1234", "56789-0"));
     }
 
     private static PortabilityOperation operation() {
-        return new PortabilityOperation("OPE-1", "BEN-123", List.of("INS-1"),
-                "Nova Credora S.A.", new ReceivingAccount("001", "1234", "56789-0"),
-                OperationStatus.PENDING, "PRT-1", null,
+        return new PortabilityOperation(new OperationId("OPE-1"), new BeneficiaryId("BEN-123"),
+                List.of("INS-1"), "Nova Credora S.A.", new ReceivingAccount("001", "1234", "56789-0"),
+                OperationStatus.PENDING, new Protocol("PRT-1"), null,
                 Instant.parse("2026-11-22T12:34:56Z"));
     }
 }

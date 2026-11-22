@@ -1,7 +1,9 @@
 package com.portability.adapters.in.web;
 
+import com.portability.domain.model.AgreementId;
 import com.portability.domain.model.Authorization;
 import com.portability.domain.model.AuthorizationResult;
+import com.portability.domain.model.BeneficiaryId;
 import com.portability.domain.ports.in.RegisterAuthorizationUseCase;
 import com.portability.domain.ports.out.CentralUnavailableException;
 import org.junit.jupiter.api.BeforeEach;
@@ -42,9 +44,11 @@ class AuthorizationControllerContractTest {
 
     @Test
     void shouldRespond201WithAuthorizationWhenOptInIsValid() throws Exception {
-        when(registerAuthorizationUseCase.registerAuthorization("BEN-123", "AGR-001"))
+        when(registerAuthorizationUseCase.registerAuthorization(
+                        new BeneficiaryId("BEN-123"), new AgreementId("AGR-001")))
                 .thenReturn(new AuthorizationResult(new Authorization(
-                        "AUT-1", "BEN-123", "AGR-001", Instant.parse("2026-11-22T12:34:56Z")), true));
+                        "AUT-1", new BeneficiaryId("BEN-123"), new AgreementId("AGR-001"),
+                        Instant.parse("2026-11-22T12:34:56Z")), true));
 
         mockMvc.perform(post("/api/authorizations")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -58,9 +62,11 @@ class AuthorizationControllerContractTest {
 
     @Test
     void shouldRespond200WithExistingAuthorizationWhenResent() throws Exception {
-        when(registerAuthorizationUseCase.registerAuthorization("BEN-123", "AGR-001"))
+        when(registerAuthorizationUseCase.registerAuthorization(
+                        new BeneficiaryId("BEN-123"), new AgreementId("AGR-001")))
                 .thenReturn(new AuthorizationResult(new Authorization(
-                        "AUT-OLD", "BEN-123", "AGR-001", Instant.parse("2026-01-01T00:00:00Z")), false));
+                        "AUT-OLD", new BeneficiaryId("BEN-123"), new AgreementId("AGR-001"),
+                        Instant.parse("2026-01-01T00:00:00Z")), false));
 
         mockMvc.perform(post("/api/authorizations")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -82,7 +88,8 @@ class AuthorizationControllerContractTest {
 
     @Test
     void mustRespond409WhenBeneficiaryAndAgreementPairIsDuplicated() throws Exception {
-        when(registerAuthorizationUseCase.registerAuthorization("BEN-123", "AGR-001"))
+        when(registerAuthorizationUseCase.registerAuthorization(
+                        new BeneficiaryId("BEN-123"), new AgreementId("AGR-001")))
                 .thenThrow(new DataIntegrityViolationException("duplicate pair"));
 
         mockMvc.perform(post("/api/authorizations")
@@ -94,13 +101,14 @@ class AuthorizationControllerContractTest {
 
     @Test
     void mustRespond502WhenCentralFails() throws Exception {
-        when(registerAuthorizationUseCase.registerAuthorization("BEN-123", "AGR-001"))
-                .thenThrow(new CentralUnavailableException("Central indisponível"));
+        when(registerAuthorizationUseCase.registerAuthorization(
+                        new BeneficiaryId("BEN-123"), new AgreementId("AGR-001")))
+                .thenThrow(new CentralUnavailableException("Central unavailable"));
 
         mockMvc.perform(post("/api/authorizations")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(VALID_BODY))
                 .andExpect(status().isBadGateway())
-                .andExpect(jsonPath("$.message").value("Central indisponível"));
+                .andExpect(jsonPath("$.message").value("Central unavailable"));
     }
 }

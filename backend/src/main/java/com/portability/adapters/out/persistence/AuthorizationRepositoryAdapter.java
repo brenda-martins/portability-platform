@@ -1,7 +1,9 @@
 package com.portability.adapters.out.persistence;
 
 import com.portability.adapters.out.persistence.entity.AuthorizationJpaEntity;
+import com.portability.domain.model.AgreementId;
 import com.portability.domain.model.Authorization;
+import com.portability.domain.model.BeneficiaryId;
 import com.portability.domain.ports.out.AuthorizationRepository;
 import org.springframework.stereotype.Component;
 
@@ -20,28 +22,29 @@ public class AuthorizationRepositoryAdapter implements AuthorizationRepository {
     public Authorization save(Authorization authorization) {
         AuthorizationJpaEntity entity = new AuthorizationJpaEntity();
         entity.setAuthorizationId(authorization.authorizationId());
-        entity.setBeneficiaryId(authorization.beneficiaryId());
-        entity.setAgreementId(authorization.agreementId());
+        entity.setBeneficiaryId(authorization.beneficiaryId().value());
+        entity.setAgreementId(authorization.agreementId().value());
         entity.setCreatedAt(authorization.createdAt());
         return toDomain(repository.save(entity));
     }
 
     @Override
-    public Optional<Authorization> findByBeneficiaryAndAgreement(String beneficiaryId, String agreementId) {
-        return repository.findByBeneficiaryIdAndAgreementId(beneficiaryId, agreementId)
+    public Optional<Authorization> findByBeneficiaryAndAgreement(
+            BeneficiaryId beneficiaryId, AgreementId agreementId) {
+        return repository.findByBeneficiaryIdAndAgreementId(beneficiaryId.value(), agreementId.value())
                 .map(AuthorizationRepositoryAdapter::toDomain);
     }
 
     @Override
-    public boolean existsByBeneficiaryId(String beneficiaryId) {
-        return repository.existsByBeneficiaryId(beneficiaryId);
+    public boolean existsByBeneficiaryId(BeneficiaryId beneficiaryId) {
+        return repository.existsByBeneficiaryId(beneficiaryId.value());
     }
 
     private static Authorization toDomain(AuthorizationJpaEntity entity) {
         return new Authorization(
                 entity.getAuthorizationId(),
-                entity.getBeneficiaryId(),
-                entity.getAgreementId(),
+                new BeneficiaryId(entity.getBeneficiaryId()),
+                new AgreementId(entity.getAgreementId()),
                 entity.getCreatedAt());
     }
 }

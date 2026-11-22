@@ -27,9 +27,9 @@ nem parâmetros de consulta.
 
 ### Ports e modelo
 
-- `GetOperationAuditUseCase.getAuditTrail(operationId): Optional<List<AuditEvent>>`: `Optional.empty()`
+- `GetOperationAuditUseCase.getAuditTrail(OperationId): Optional<List<AuditEvent>>`: `Optional.empty()`
   significa operação inexistente; `Optional.of(List.of())` significa operação existente sem eventos.
-- `AuditEventRepository.findByOperationId(operationId)` devolve os eventos da operação em ordem de
+- `AuditEventRepository.findByOperationId(OperationId)` devolve os eventos da operação em ordem de
   ocorrência. `append` continua sendo a única escrita, sem atualização ou remoção.
 - `AuditEventType` reúne as constantes (`REQUESTED`, `CONFIRMED`, `REJECTED`, `INTEGRATION_FAILURE`,
   `ACCOUNT_UPDATED`), cada uma com `externalValue()` que preserva os valores do contrato

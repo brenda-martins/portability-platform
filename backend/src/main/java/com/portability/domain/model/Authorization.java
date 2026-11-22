@@ -4,14 +4,14 @@ import java.time.Instant;
 
 public record Authorization(
         String authorizationId,
-        String beneficiaryId,
-        String agreementId,
+        BeneficiaryId beneficiaryId,
+        AgreementId agreementId,
         Instant createdAt
 ) {
     public Authorization {
         Validation.requireNotBlank(authorizationId, "authorizationId");
-        Validation.requireNotBlank(beneficiaryId, "beneficiaryId");
-        Validation.requireNotBlank(agreementId, "agreementId");
+        Validation.requireNonNull(beneficiaryId, "beneficiaryId");
+        Validation.requireNonNull(agreementId, "agreementId");
         if (createdAt == null) {
             throw new InvalidRequestException("createdAt", "createdAt must not be null");
         }

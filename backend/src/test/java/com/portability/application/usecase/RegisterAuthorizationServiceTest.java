@@ -1,8 +1,10 @@
 package com.portability.application.usecase;
 
 import com.portability.application.RegisterAuthorizationService;
+import com.portability.domain.model.AgreementId;
 import com.portability.domain.model.Authorization;
 import com.portability.domain.model.AuthorizationResult;
+import com.portability.domain.model.BeneficiaryId;
 import com.portability.domain.model.InvalidRequestException;
 import com.portability.domain.ports.out.CentralUnavailableException;
 import org.junit.jupiter.api.BeforeEach;
@@ -17,8 +19,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class RegisterAuthorizationServiceTest {
 
-    private static final String BENEFICIARY = "BEN-123";
-    private static final String AGREEMENT = "AGR-001";
+    private static final BeneficiaryId BENEFICIARY = new BeneficiaryId("BEN-123");
+    private static final AgreementId AGREEMENT = new AgreementId("AGR-001");
     private static final String CREATED_AT = "2026-11-22T12:34:56Z";
 
     private TestDoubles.State state;
@@ -66,9 +68,9 @@ class RegisterAuthorizationServiceTest {
     }
 
     @Test
-    void mustRejectBlankBeneficiaryWithoutTouchingPorts() {
+    void mustRejectBlankBeneficiaryBeforeTouchingPorts() {
         InvalidRequestException error = assertThrows(InvalidRequestException.class,
-                () -> service.registerAuthorization(" ", AGREEMENT));
+                () -> new BeneficiaryId(" "));
 
         assertEquals("beneficiaryId must not be blank", error.fields().get("beneficiaryId"));
         assertTrue(state.authorizations.isEmpty());
@@ -77,12 +79,12 @@ class RegisterAuthorizationServiceTest {
 
     @Test
     void mustNotPersistAuthorizationWhenCentralFails() {
-        central.failure = TestDoubles.centralFailure("Central indisponível");
+        central.failure = TestDoubles.centralFailure("Central unavailable");
 
         assertThrows(CentralUnavailableException.class,
                 () -> service.registerAuthorization(BENEFICIARY, AGREEMENT));
 
         assertTrue(state.authorizations.isEmpty());
-        assertTrue(auditEvents.findByOperationId("OPE-1").isEmpty());
+        assertTrue(auditEvents.findByOperationId(new com.portability.domain.model.OperationId("OPE-1")).isEmpty());
     }
 }

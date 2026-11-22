@@ -29,7 +29,6 @@ A linguagem visual — dona de tokens, componentes, estados e responsividade —
 
 ## Planejamento
 
-Funcionalidades, dependências, status e próximas ações: [`../docs/roadmap.md`](../docs/roadmap.md).
 PRD, spec, tarefas e planos: [`../docs/funcionalidades/README.md`](../docs/funcionalidades/README.md).
 Processo de SDD: [`../AGENTS.md`](../AGENTS.md), seção "Processo obrigatório de SDD".
 A verificação completa está na seção de mesmo nome de [`AGENTS.md`](AGENTS.md).

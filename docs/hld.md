@@ -4,8 +4,6 @@
 > tecnologias e contratos HTTP ficam no README, seções "Tecnologias" e "Documentação da API";
 > detalhes de implementação em [`lld.md`](lld.md);
 > convenções de código no [`../AGENTS.md`](../AGENTS.md); termos em [`../GLOSSARY.md`](../GLOSSARY.md).
-> Quando uma tarefa alterar algo registrado aqui, carregue a skill `hld` (se disponível) em modo
-> atualizar antes de editar este arquivo.
 
 ## Contexto do sistema
 
@@ -131,4 +129,4 @@ A consulta é somente leitura: não chama a Central, não acrescenta eventos e n
 - Versões das tecnologias: README, seção "Tecnologias".
 - Contratos HTTP: README, seção "Documentação da API".
 - Sequência detalhada, mapeamentos e estruturas internas: [`lld.md`](lld.md).
-- Funcionalidades e status: [`roadmap.md`](roadmap.md).
+- Planejamento: [`funcionalidades/README.md`](funcionalidades/README.md).

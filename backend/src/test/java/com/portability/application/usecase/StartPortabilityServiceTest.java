@@ -1,17 +1,23 @@
 package com.portability.application.usecase;
 
 import com.portability.application.StartPortabilityService;
+import com.portability.domain.model.AgreementId;
 import com.portability.domain.model.AuditEvent;
 import com.portability.domain.model.AuditEventType;
+import com.portability.domain.model.Authorization;
+import com.portability.domain.model.BeneficiaryId;
 import com.portability.domain.model.BeneficiaryNotAuthorizedException;
 import com.portability.domain.model.ConcurrentOperationException;
 import com.portability.domain.model.DiscountInstallment;
 import com.portability.domain.model.InstallmentStatus;
 import com.portability.domain.model.InvalidRequestException;
+import com.portability.domain.model.OperationId;
 import com.portability.domain.model.OperationStatus;
 import com.portability.domain.model.PortabilityOperation;
 import com.portability.domain.model.PortabilityOperationResult;
+import com.portability.domain.model.Protocol;
 import com.portability.domain.model.ReceivingAccount;
+import com.portability.domain.model.StartPortabilityCommand;
 import com.portability.domain.ports.out.CentralUnavailableException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -28,8 +34,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class StartPortabilityServiceTest {
 
-    private static final String BENEFICIARY = "BEN-123";
-    private static final String AGREEMENT = "AGR-001";
+    private static final BeneficiaryId BENEFICIARY = new BeneficiaryId("BEN-123");
+    private static final AgreementId AGREEMENT = new AgreementId("AGR-001");
     private static final String CREDITOR = "Nova Credora S.A.";
     private static final String REQUESTED_AT = "2026-11-22T12:34:56Z";
 
@@ -61,29 +67,26 @@ class StartPortabilityServiceTest {
         authorize();
         agenda.installments = List.of(openInstallment("INS-1", "2099-01-10"));
 
-        PortabilityOperationResult result = service.startPortability(
-                BENEFICIARY, List.of("INS-1"), CREDITOR, account());
+        PortabilityOperationResult result = service.startPortability(command(List.of("INS-1")));
 
         assertTrue(result.created());
-        assertEquals("PRT-1", result.operation().protocol());
+        assertEquals(new Protocol("PRT-1"), result.operation().protocol());
         assertEquals(OperationStatus.PENDING, result.operation().status());
         assertEquals(List.of("INS-1"), result.operation().installmentIds());
         assertEquals(Instant.parse(REQUESTED_AT), result.operation().requestedAt());
         assertEquals(1, auditEvents.findByOperationId(result.operation().operationId()).size());
         AuditEvent event = auditEvents.findByOperationId(result.operation().operationId()).getFirst();
         assertEquals(AuditEventType.REQUESTED.externalValue(), event.eventType());
-        assertTrue(event.message().contains("PRT-1"));
+        assertTrue(event.message().startsWith("Operation requested with protocol PRT-1"));
         assertTrue(metrics.names.contains("portability.created"));
     }
 
     @Test
     void mustReturnExistingOperationWithoutCallingCentralWhenResent() {
-        PortabilityOperation existing = pendingOperation("OPE-OLD");
-        operations.seed(existing, PortabilityOperation.idempotencyKey(
-                BENEFICIARY, List.of("INS-1"), CREDITOR, account()));
+        PortabilityOperation existing = pendingOperation(new OperationId("OPE-OLD"));
+        operations.seed(existing, PortabilityOperation.idempotencyKey(command(List.of("INS-1"))));
 
-        PortabilityOperationResult result = service.startPortability(
-                BENEFICIARY, List.of("INS-1"), CREDITOR, account());
+        PortabilityOperationResult result = service.startPortability(command(List.of("INS-1")));
 
         assertFalse(result.created());
         assertEquals(existing, result.operation());
@@ -96,20 +99,18 @@ class StartPortabilityServiceTest {
         authorize();
         agenda.installments = List.of(openInstallment("INS-1", "2099-01-10"));
 
-        service.startPortability(BENEFICIARY, List.of("INS-1"), CREDITOR, account());
+        service.startPortability(command(List.of("INS-1")));
 
         assertEquals(List.of("reserve", "central"), state.calls);
     }
 
     @Test
     void mustReturnExistingOperationWithoutCallingCentralWhenReservationConflicts() {
-        PortabilityOperation existing = pendingOperation("OPE-OLD");
-        operations.seed(existing, PortabilityOperation.idempotencyKey(
-                BENEFICIARY, List.of("INS-1"), CREDITOR, account()));
+        PortabilityOperation existing = pendingOperation(new OperationId("OPE-OLD"));
+        operations.seed(existing, PortabilityOperation.idempotencyKey(command(List.of("INS-1"))));
         operations.hideExistingOnFirstLookup = true;
 
-        PortabilityOperationResult result = service.startPortability(
-                BENEFICIARY, List.of("INS-1"), CREDITOR, account());
+        PortabilityOperationResult result = service.startPortability(command(List.of("INS-1")));
 
         assertFalse(result.created());
         assertEquals(existing, result.operation());
@@ -124,9 +125,8 @@ class StartPortabilityServiceTest {
         agenda.installments = List.of(openInstallment("INS-1", "2099-01-10"),
                 openInstallment("INS-2", "2099-01-10"));
 
-        service.startPortability(BENEFICIARY, List.of("INS-1", "INS-2"), CREDITOR, account());
-        PortabilityOperationResult second = service.startPortability(
-                BENEFICIARY, List.of("INS-2", "INS-1"), CREDITOR, account());
+        service.startPortability(command(List.of("INS-1", "INS-2")));
+        PortabilityOperationResult second = service.startPortability(command(List.of("INS-2", "INS-1")));
 
         assertFalse(second.created());
         assertEquals(1, state.operations.size());
@@ -134,8 +134,8 @@ class StartPortabilityServiceTest {
 
     @Test
     void mustRejectOperationWhenBeneficiaryHasNoOptIn() {
-        assertThrows(BeneficiaryNotAuthorizedException.class, () -> service.startPortability(
-                BENEFICIARY, List.of("INS-1"), CREDITOR, account()));
+        assertThrows(BeneficiaryNotAuthorizedException.class,
+                () -> service.startPortability(command(List.of("INS-1"))));
 
         assertTrue(state.operations.isEmpty());
         assertTrue(state.auditEvents.isEmpty());
@@ -146,8 +146,8 @@ class StartPortabilityServiceTest {
         authorize();
         agenda.installments = List.of(openInstallment("INS-1", "2099-01-10"));
 
-        assertThrows(InvalidRequestException.class, () -> service.startPortability(
-                BENEFICIARY, List.of("INS-9"), CREDITOR, account()));
+        assertThrows(InvalidRequestException.class,
+                () -> service.startPortability(command(List.of("INS-9"))));
         assertTrue(state.operations.isEmpty());
     }
 
@@ -157,8 +157,9 @@ class StartPortabilityServiceTest {
         agenda.installments = List.of(new DiscountInstallment("INS-1", AGREEMENT, new BigDecimal("120.50"),
                 LocalDate.parse("2099-01-10"), InstallmentStatus.PORTED));
 
-        assertThrows(InvalidRequestException.class, () -> service.startPortability(
-                BENEFICIARY, List.of("INS-1"), CREDITOR, account()));
+        InvalidRequestException error = assertThrows(InvalidRequestException.class,
+                () -> service.startPortability(command(List.of("INS-1"))));
+        assertTrue(error.getMessage().startsWith("Ineligible installment: INS-1"));
         assertTrue(state.operations.isEmpty());
     }
 
@@ -167,15 +168,15 @@ class StartPortabilityServiceTest {
         authorize();
         agenda.installments = List.of(openInstallment("INS-1", "2020-01-10"));
 
-        assertThrows(InvalidRequestException.class, () -> service.startPortability(
-                BENEFICIARY, List.of("INS-1"), CREDITOR, account()));
+        assertThrows(InvalidRequestException.class,
+                () -> service.startPortability(command(List.of("INS-1"))));
         assertTrue(state.operations.isEmpty());
     }
 
     @Test
     void mustRejectDuplicatedInstallmentIdsBeforeCallingPorts() {
         InvalidRequestException error = assertThrows(InvalidRequestException.class,
-                () -> service.startPortability(BENEFICIARY, List.of("INS-1", "INS-1"), CREDITOR, account()));
+                () -> service.startPortability(command(List.of("INS-1", "INS-1"))));
 
         assertEquals("installmentIds must not contain duplicates", error.fields().get("installmentIds"));
         assertTrue(state.operations.isEmpty());
@@ -185,22 +186,22 @@ class StartPortabilityServiceTest {
     @Test
     void mustRejectEmptySelectionBeforeCallingPorts() {
         assertThrows(InvalidRequestException.class,
-                () -> service.startPortability(BENEFICIARY, List.of(), CREDITOR, account()));
+                () -> service.startPortability(command(List.of())));
         assertTrue(state.operations.isEmpty());
     }
 
     @Test
     void mustRejectBlankCreditorBeforeCallingCentral() {
         assertThrows(InvalidRequestException.class,
-                () -> service.startPortability(BENEFICIARY, List.of("INS-1"), " ", account()));
+                () -> service.startPortability(command(List.of("INS-1"), " ", account())));
         assertTrue(state.operations.isEmpty());
     }
 
     @Test
     void mustRejectIncompleteReceivingAccountBeforeCallingCentral() {
         InvalidRequestException error = assertThrows(InvalidRequestException.class,
-                () -> service.startPortability(BENEFICIARY, List.of("INS-1"), CREDITOR,
-                        new ReceivingAccount("001", " ", "56789-0")));
+                () -> service.startPortability(command(List.of("INS-1"), CREDITOR,
+                        new ReceivingAccount("001", " ", "56789-0"))));
 
         assertEquals("agency must not be blank", error.fields().get("agency"));
         assertTrue(state.operations.isEmpty());
@@ -210,10 +211,10 @@ class StartPortabilityServiceTest {
     void mustNotPersistOperationOrEventWhenCentralFails() {
         authorize();
         agenda.installments = List.of(openInstallment("INS-1", "2099-01-10"));
-        central.registrationFailure = TestDoubles.centralFailure("Central indisponível");
+        central.registrationFailure = TestDoubles.centralFailure("Central unavailable");
 
-        assertThrows(CentralUnavailableException.class, () -> service.startPortability(
-                BENEFICIARY, List.of("INS-1"), CREDITOR, account()));
+        assertThrows(CentralUnavailableException.class,
+                () -> service.startPortability(command(List.of("INS-1"))));
 
         assertTrue(state.operations.isEmpty());
         assertTrue(state.auditEvents.isEmpty());
@@ -225,21 +226,31 @@ class StartPortabilityServiceTest {
         agenda.installments = List.of(openInstallment("INS-1", "2099-01-10"));
         operations.failOnSave = true;
 
-        assertThrows(ConcurrentOperationException.class, () -> service.startPortability(
-                BENEFICIARY, List.of("INS-1"), CREDITOR, account()));
+        assertThrows(ConcurrentOperationException.class,
+                () -> service.startPortability(command(List.of("INS-1"))));
 
         assertTrue(state.operations.isEmpty());
         assertTrue(state.auditEvents.isEmpty());
     }
 
     private void authorize() {
-        authorizations.save(new com.portability.domain.model.Authorization(
+        authorizations.save(new Authorization(
                 "AUT-1", BENEFICIARY, AGREEMENT, Instant.parse(REQUESTED_AT)));
     }
 
-    private static PortabilityOperation pendingOperation(String operationId) {
+    private static StartPortabilityCommand command(List<String> installments) {
+        return command(installments, CREDITOR, account());
+    }
+
+    private static StartPortabilityCommand command(
+            List<String> installments, String creditor, ReceivingAccount account) {
+        return new StartPortabilityCommand(BENEFICIARY, installments, creditor, account);
+    }
+
+    private static PortabilityOperation pendingOperation(OperationId operationId) {
         return new PortabilityOperation(operationId, BENEFICIARY, List.of("INS-1"), CREDITOR,
-                account(), OperationStatus.PENDING, "PRT-OLD", null, Instant.parse(REQUESTED_AT));
+                account(), OperationStatus.PENDING, new Protocol("PRT-OLD"), null,
+                Instant.parse(REQUESTED_AT), 0L);
     }
 
     private static ReceivingAccount account() {

@@ -19,13 +19,13 @@ public record OperationResponse(
 ) {
     public static OperationResponse from(PortabilityOperation operation) {
         return new OperationResponse(
-                operation.operationId(),
-                operation.beneficiaryId(),
+                operation.operationId().value(),
+                operation.beneficiaryId().value(),
                 operation.installmentIds(),
                 operation.creditorAssignee(),
                 ReceivingAccountResponse.from(operation.receivingAccount()),
                 operation.status(),
-                operation.protocol(),
+                operation.protocol() == null ? null : operation.protocol().value(),
                 operation.rejectionReason(),
                 operation.requestedAt());
     }

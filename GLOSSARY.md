@@ -24,7 +24,7 @@ Central usa os nomes em português do PDF e é traduzido no adapter.
 | Idempotência | `idempotencyKey`, `findByIdempotencyKey` | Propriedade de reenvios não gerarem operações duplicadas na Central nem localmente; a chave é reservada antes da integração. |
 | Assinatura | `signature` / `assinatura` | HMAC-SHA256 em Base64 usado para integridade das mensagens trocadas com a Central. |
 | Backoff | `BackoffPort` | Estratégia de espera progressiva entre tentativas de consulta de status. |
-| Funcionalidade | — | Uma entrega demonstrável no produto, descrita pelo que a pessoa consegue fazer (ver `docs/roadmap.md`). |
+| Funcionalidade | — | Uma entrega demonstrável no produto, descrita pelo que a pessoa consegue fazer (ver `docs/funcionalidades/README.md`). |
 | Tarefa | `F<NN>-T<NN>` | Parte entregável de uma funcionalidade, derivada da spec. |
 
 ## Regras de uso

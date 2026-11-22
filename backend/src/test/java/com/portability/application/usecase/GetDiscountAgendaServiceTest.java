@@ -1,6 +1,9 @@
 package com.portability.application.usecase;
 
 import com.portability.application.GetDiscountAgendaService;
+import com.portability.domain.model.AgreementId;
+import com.portability.domain.model.Authorization;
+import com.portability.domain.model.BeneficiaryId;
 import com.portability.domain.model.BeneficiaryNotAuthorizedException;
 import com.portability.domain.model.DiscountInstallment;
 import com.portability.domain.model.InstallmentStatus;
@@ -10,6 +13,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -19,7 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class GetDiscountAgendaServiceTest {
 
-    private static final String BENEFICIARY = "BEN-123";
+    private static final BeneficiaryId BENEFICIARY = new BeneficiaryId("BEN-123");
 
     private TestDoubles.State state;
     private TestDoubles.Authorizations authorizations;
@@ -56,7 +60,7 @@ class GetDiscountAgendaServiceTest {
 
     @Test
     void mustRejectBlankBeneficiaryBeforeConsultingPorts() {
-        assertThrows(InvalidRequestException.class, () -> service.getAgenda(" "));
+        assertThrows(InvalidRequestException.class, () -> new BeneficiaryId(" "));
 
         assertTrue(metrics.names.isEmpty());
     }
@@ -64,19 +68,19 @@ class GetDiscountAgendaServiceTest {
     @Test
     void mustPropagateCentralFailureWithoutPartialAgenda() {
         authorize();
-        agenda.failure = TestDoubles.centralFailure("Central indisponível");
+        agenda.failure = TestDoubles.centralFailure("Central unavailable");
 
         assertThrows(CentralUnavailableException.class, () -> service.getAgenda(BENEFICIARY));
         assertTrue(metrics.names.isEmpty());
     }
 
     private void authorize() {
-        authorizations.save(new com.portability.domain.model.Authorization(
-                "AUT-1", BENEFICIARY, "AGR-001", java.time.Instant.parse("2026-11-22T12:34:56Z")));
+        authorizations.save(new Authorization(
+                "AUT-1", BENEFICIARY, new AgreementId("AGR-001"), Instant.parse("2026-11-22T12:34:56Z")));
     }
 
     private static DiscountInstallment installment(String id, InstallmentStatus status) {
-        return new DiscountInstallment(id, "AGR-001", new BigDecimal("120.50"),
+        return new DiscountInstallment(id, new AgreementId("AGR-001"), new BigDecimal("120.50"),
                 LocalDate.parse("2099-01-10"), status);
     }
 }

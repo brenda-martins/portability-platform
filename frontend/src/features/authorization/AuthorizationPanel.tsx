@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useState, type SubmitEvent } from 'react';
 import { describeApiError } from '../../api/ApiError';
 import { apiFetch } from '../../api/client';
 import { PanelHeader } from '../../components/PanelHeader';
@@ -15,7 +15,7 @@ export function AuthorizationPanel({ onAuthorized }: AuthorizationPanelProps) {
   const [confirmation, setConfirmation] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
     setLoading(true);
     setError(null);

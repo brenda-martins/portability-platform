@@ -3,9 +3,10 @@ package com.portability.application;
 import com.portability.domain.model.AuditEvent;
 import com.portability.domain.model.AuditEventType;
 import com.portability.domain.model.CentralOperationStatus;
+import com.portability.domain.model.OperationId;
 import com.portability.domain.model.OperationStatus;
 import com.portability.domain.model.PortabilityOperation;
-import com.portability.domain.model.Validation;
+import com.portability.domain.model.Protocol;
 import com.portability.domain.ports.in.GetOperationStatusUseCase;
 import com.portability.domain.ports.out.AuditEventRepository;
 import com.portability.domain.ports.out.BackoffPort;
@@ -18,6 +19,7 @@ import com.portability.domain.ports.out.TransactionPort;
 
 import java.time.Clock;
 import java.time.Duration;
+import java.util.Map;
 import java.util.Optional;
 
 /** Follows the Central status while the operation is pending, preserving backoff interruption. */
@@ -27,23 +29,34 @@ public class GetOperationStatusService implements GetOperationStatusUseCase {
     private static final Duration BASE_BACKOFF = Duration.ofSeconds(1);
     private static final Duration MAX_BACKOFF = Duration.ofSeconds(5);
 
+    private static final Map<OperationStatus, StatusOutcome> OUTCOMES = Map.of(
+            OperationStatus.CONFIRMED, 
+            new StatusOutcome(AuditEventType.CONFIRMED,
+           (central, protocol) -> "Operation confirmed by Central with protocol " + protocol.value()),
+            OperationStatus.REJECTED, 
+            new StatusOutcome(AuditEventType.REJECTED,
+            (central, protocol) -> "Operation rejected by Central with protocol " + protocol.value() + ": " + central.rejectionReason())
+    );
+
     private final OperationRepository operationRepository;
     private final AuditEventRepository auditEventRepository;
     private final CentralPortabilityPort centralPortabilityPort;
     private final BackoffPort backoffPort;
     private final TransactionPort transactions;
+    private final IntegrationFailureRecorder failureRecorder;
     private final Clock clock;
     private final IdGenerator ids;
     private final MetricsPort metrics;
 
     public GetOperationStatusService(
         final OperationRepository operationRepository,
-        final AuditEventRepository auditEventRepository, 
+        final AuditEventRepository auditEventRepository,
         final CentralPortabilityPort centralPortabilityPort,
-        final BackoffPort backoffPort, 
-        final TransactionPort transactions, 
+        final BackoffPort backoffPort,
+        final TransactionPort transactions,
+        final IntegrationFailureRecorder failureRecorder,
         final Clock clock,
-        final IdGenerator ids, 
+        final IdGenerator ids,
         final MetricsPort metrics
     ) {
         this.operationRepository = operationRepository;
@@ -51,15 +64,14 @@ public class GetOperationStatusService implements GetOperationStatusUseCase {
         this.centralPortabilityPort = centralPortabilityPort;
         this.backoffPort = backoffPort;
         this.transactions = transactions;
+        this.failureRecorder = failureRecorder;
         this.clock = clock;
         this.ids = ids;
         this.metrics = metrics;
     }
 
     @Override
-    public Optional<PortabilityOperation> getOperationStatus(String operationId) {
-        Validation.requireNotBlank(operationId, "operationId");
-        
+    public Optional<PortabilityOperation> getOperationStatus(OperationId operationId) {
         Optional<PortabilityOperation> found = operationRepository.findById(operationId);
         if (found.isEmpty()) {
             return Optional.empty();
@@ -74,7 +86,7 @@ public class GetOperationStatusService implements GetOperationStatusUseCase {
             try {
                 central = centralPortabilityPort.consultStatus(current.protocol());
             } catch (CentralUnavailableException exception) {
-                appendFailure(current, "Falha ao consultar status na Central", exception);
+                failureRecorder.record(operationId, "Failed to consult status at Central", exception);
                 throw exception;
             }
 
@@ -91,39 +103,31 @@ public class GetOperationStatusService implements GetOperationStatusUseCase {
                 continue;
             }
 
-            AuditEventType eventType = central.status() == OperationStatus.REJECTED
-                    ? AuditEventType.REJECTED : AuditEventType.CONFIRMED;
-           
+            StatusOutcome outcome = OUTCOMES.get(central.status());
+            if (outcome == null) {
+                CentralUnavailableException exception =
+                        new CentralUnavailableException("Unexpected response from Central");
+                failureRecorder.record(operationId, "Failed to interpret status from Central", exception);
+                throw exception;
+            }
+
             PortabilityOperation transitioned = current.transitionTo(central.status(), central.rejectionReason());
-           
             PortabilityOperation saved = transactions.inTransaction(() -> {
                 PortabilityOperation persisted = operationRepository.save(transitioned);
                 boolean alreadyRecorded = auditEventRepository.findByOperationId(operationId).stream()
-                        .anyMatch(event -> eventType.externalValue().equals(event.eventType()));
+                        .anyMatch(event -> outcome.eventType().externalValue().equals(event.eventType()));
                 if (!alreadyRecorded) {
-                    auditEventRepository.append(new AuditEvent(ids.next(), operationId, eventType,
-                            statusMessage(central, current.protocol()), clock.instant()));
+                    auditEventRepository.append(new AuditEvent(ids.next(), operationId,
+                            outcome.eventType(), outcome.message().build(central, current.protocol()),
+                            clock.instant()));
                 }
                 return persisted;
             });
-            metrics.increment("operation." + eventType.name().toLowerCase());
+            metrics.increment("operation." + outcome.eventType().name().toLowerCase());
             return Optional.of(saved);
         }
         metrics.increment("operation.still-pending");
         return Optional.of(current);
-    }
-
-    private void appendFailure(
-        PortabilityOperation operation, 
-        String context,
-        CentralUnavailableException exception
-    ) {
-        transactions.inTransaction(() -> {
-            auditEventRepository.append(new AuditEvent(ids.next(), operation.operationId(),
-                    AuditEventType.INTEGRATION_FAILURE, context + ": " + exception.getMessage(), clock.instant()));
-            return null;
-        });
-        metrics.increment("operation.integration-failure");
     }
 
     private static Duration backoffDelay(int attempt, Duration retryAfter) {
@@ -133,11 +137,11 @@ public class GetOperationStatusService implements GetOperationStatusUseCase {
         return chosen.compareTo(MAX_BACKOFF) > 0 ? MAX_BACKOFF : chosen;
     }
 
-    private static String statusMessage(CentralOperationStatus central, String protocol) {
-        if (central.status() == OperationStatus.REJECTED) {
-            return "Operação rejeitada pela Central com protocolo " + protocol
-                    + ": " + central.rejectionReason();
-        }
-        return "Operação confirmada pela Central com protocolo " + protocol;
+    @FunctionalInterface
+    private interface StatusMessage {
+        String build(CentralOperationStatus central, Protocol protocol);
+    }
+
+    private record StatusOutcome(AuditEventType eventType, StatusMessage message) {
     }
 }

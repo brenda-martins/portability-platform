@@ -63,8 +63,8 @@ public class ApiExceptionHandler {
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<Map<String, Object>> handleConstraint(DataIntegrityViolationException exception) {
         String message = ConstraintConflict.isViolationOf(exception, "idempotency")
-                ? "Operação já registrada para esta solicitação"
-                : "Conflito de unicidade nos dados informados";
+                ? "Operation already registered for this request"
+                : "Uniqueness conflict in the submitted data";
         return ResponseEntity.status(HttpStatus.CONFLICT).body(errorBody(message));
     }
 
@@ -72,7 +72,7 @@ public class ApiExceptionHandler {
     public ResponseEntity<Map<String, Object>> handleConcurrentUpdate(
             OptimisticLockingFailureException exception) {
         return ResponseEntity.status(HttpStatus.CONFLICT)
-                .body(errorBody("Operação alterada por outra requisição; tente novamente"));
+                .body(errorBody("Operation changed by another request; please try again"));
     }
 
     private static Map<String, Object> errorBody(String message) {

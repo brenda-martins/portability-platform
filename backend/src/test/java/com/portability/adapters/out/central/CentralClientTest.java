@@ -1,10 +1,14 @@
 package com.portability.adapters.out.central;
 
+import com.portability.domain.model.AgreementId;
+import com.portability.domain.model.BeneficiaryId;
 import com.portability.domain.model.CentralOperationStatus;
 import com.portability.domain.model.DiscountInstallment;
 import com.portability.domain.model.InstallmentStatus;
 import com.portability.domain.model.OperationStatus;
+import com.portability.domain.model.Protocol;
 import com.portability.domain.model.ReceivingAccount;
+import com.portability.domain.model.StartPortabilityCommand;
 import com.portability.domain.ports.out.CentralUnavailableException;
 import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.AfterEach;
@@ -131,7 +135,8 @@ class CentralClientTest {
 
     @Test
     void mustSendSignedPayloadAndUseIdReturnedByCentral() throws Exception {
-        String authorizationId = client.registerAuthorization("BEN-123", "AGR-001");
+        String authorizationId = client.registerAuthorization(
+                new BeneficiaryId("BEN-123"), new AgreementId("AGR-001"));
 
         assertEquals("AUT-1", authorizationId);
         JsonNode payload = new ObjectMapper().readTree(receivedBody);
@@ -148,18 +153,20 @@ class CentralClientTest {
         responseStatus = 500;
         responseBody = "{\"erro\":\"indisponivel\"}";
 
-        assertThrows(CentralUnavailableException.class,
-                () -> client.registerAuthorization("BEN-123", "AGR-001"));
+        CentralUnavailableException error = assertThrows(CentralUnavailableException.class,
+                () -> client.registerAuthorization(
+                        new BeneficiaryId("BEN-123"), new AgreementId("AGR-001")));
+        assertEquals("Central unavailable", error.getMessage());
     }
 
     @Test
     void shouldTranslateAgendaFromCentralContract() {
-        List<DiscountInstallment> agenda = client.fetchAgenda("BEN-123");
+        List<DiscountInstallment> agenda = client.fetchAgenda(new BeneficiaryId("BEN-123"));
 
         assertEquals(1, agenda.size());
         DiscountInstallment installment = agenda.get(0);
         assertEquals("INS-1", installment.installmentId());
-        assertEquals("AGR-001", installment.agreementId());
+        assertEquals(new AgreementId("AGR-001"), installment.agreementId());
         assertEquals(new BigDecimal("120.50"), installment.amount());
         assertEquals(LocalDate.parse("2099-01-10"), installment.discountDate());
         assertEquals(InstallmentStatus.OPEN, installment.status());
@@ -169,7 +176,7 @@ class CentralClientTest {
     void shouldFailWhenAgendaRespondsWithError() {
         agendaStatus = 500;
 
-        assertThrows(CentralUnavailableException.class, () -> client.fetchAgenda("BEN-123"));
+        assertThrows(CentralUnavailableException.class, () -> client.fetchAgenda(new BeneficiaryId("BEN-123")));
     }
 
     @Test
@@ -177,15 +184,14 @@ class CentralClientTest {
         agendaBody = "[{\"parcelaId\":\"INS-1\",\"convenioId\":\"AGR-001\",\"valor\":120.50,"
                 + "\"dataDesconto\":\"2099-01-10\",\"status\":\"DESCONHECIDO\"}]";
 
-        assertThrows(CentralUnavailableException.class, () -> client.fetchAgenda("BEN-123"));
+        assertThrows(CentralUnavailableException.class, () -> client.fetchAgenda(new BeneficiaryId("BEN-123")));
     }
 
     @Test
     void mustSendCanonicalBodySignedAndReturnProtocol() throws Exception {
-        String protocol = client.registerPortability("BEN-123", List.of("INS-1"),
-                "Nova Credora S.A.", new ReceivingAccount("001", "1234", "56789-0"));
+        Protocol protocol = client.registerPortability(portabilityCommand());
 
-        assertEquals("PRT-1", protocol);
+        assertEquals(new Protocol("PRT-1"), protocol);
         JsonNode payload = new ObjectMapper().readTree(receivedBody);
         assertEquals("BEN-123", payload.path("beneficiarioId").asText());
         assertEquals("INS-1", payload.path("parcelas").get(0).asText());
@@ -200,18 +206,14 @@ class CentralClientTest {
     void shouldFailWhenCentralRejectsPortability() {
         operationStatus = 500;
 
-        assertThrows(CentralUnavailableException.class, () -> client.registerPortability(
-                "BEN-123", List.of("INS-1"), "Nova Credora S.A.",
-                new ReceivingAccount("001", "1234", "56789-0")));
+        assertThrows(CentralUnavailableException.class, () -> client.registerPortability(portabilityCommand()));
     }
 
     @Test
     void shouldFailWhenCentralReturnsBlankProtocol() {
         operationBody = "{\"protocolo\":\" \"}";
 
-        assertThrows(CentralUnavailableException.class, () -> client.registerPortability(
-                "BEN-123", List.of("INS-1"), "Nova Credora S.A.",
-                new ReceivingAccount("001", "1234", "56789-0")));
+        assertThrows(CentralUnavailableException.class, () -> client.registerPortability(portabilityCommand()));
     }
 
     @Test
@@ -219,7 +221,7 @@ class CentralClientTest {
         statusCode = 204;
         statusRetryAfter = "2";
 
-        CentralOperationStatus status = client.consultStatus("PRT-1");
+        CentralOperationStatus status = client.consultStatus(new Protocol("PRT-1"));
 
         assertEquals(OperationStatus.PENDING, status.status());
         assertEquals(Duration.ofSeconds(2), status.retryAfter());
@@ -232,7 +234,7 @@ class CentralClientTest {
         statusCode = 200;
         statusBody = "{\"status\":\"CONFIRMADA\",\"motivoRejeicao\":null}";
 
-        CentralOperationStatus status = client.consultStatus("PRT-1");
+        CentralOperationStatus status = client.consultStatus(new Protocol("PRT-1"));
 
         assertEquals(OperationStatus.CONFIRMED, status.status());
         assertEquals(Duration.ZERO, status.retryAfter());
@@ -243,7 +245,7 @@ class CentralClientTest {
         statusCode = 200;
         statusBody = "{\"status\":\"REJEITADA\",\"motivoRejeicao\":\"Convênio bloqueado\"}";
 
-        CentralOperationStatus status = client.consultStatus("PRT-1");
+        CentralOperationStatus status = client.consultStatus(new Protocol("PRT-1"));
 
         assertEquals(OperationStatus.REJECTED, status.status());
         assertEquals("Convênio bloqueado", status.rejectionReason());
@@ -253,7 +255,7 @@ class CentralClientTest {
     void shouldFailWhenCentralStatusRespondsWithError() {
         statusCode = 500;
 
-        assertThrows(CentralUnavailableException.class, () -> client.consultStatus("PRT-1"));
+        assertThrows(CentralUnavailableException.class, () -> client.consultStatus(new Protocol("PRT-1")));
     }
 
     @Test
@@ -261,7 +263,7 @@ class CentralClientTest {
         statusCode = 503;
         statusBody = "";
 
-        assertThrows(CentralUnavailableException.class, () -> client.consultStatus("PRT-1"));
+        assertThrows(CentralUnavailableException.class, () -> client.consultStatus(new Protocol("PRT-1")));
     }
 
     @Test
@@ -269,21 +271,21 @@ class CentralClientTest {
         statusCode = 200;
         statusBody = "{\"status\":\"DESCONHECIDO\",\"motivoRejeicao\":null}";
 
-        assertThrows(CentralUnavailableException.class, () -> client.consultStatus("PRT-1"));
+        assertThrows(CentralUnavailableException.class, () -> client.consultStatus(new Protocol("PRT-1")));
     }
 
     @Test
     void shouldFailWhenRetryAfterIsInvalid() {
         statusCode = 204;
-        statusRetryAfter = "inválido";
+        statusRetryAfter = "invalid";
 
-        assertThrows(CentralUnavailableException.class, () -> client.consultStatus("PRT-1"));
+        assertThrows(CentralUnavailableException.class, () -> client.consultStatus(new Protocol("PRT-1")));
     }
 
     @Test
     void mustSendSignedPutWithProtocolAndReturnUpdatedAccount() throws Exception {
         ReceivingAccount updated = client.updateReceivingAccount(
-                "PRT-1", new ReceivingAccount("002", "4321", "98765-4"));
+                new Protocol("PRT-1"), new ReceivingAccount("002", "4321", "98765-4"));
 
         assertEquals(new ReceivingAccount("002", "4321", "98765-4"), updated);
         assertEquals("/central/operacoes-portabilidade/PRT-1/conta-recebimento", accountPath);
@@ -302,7 +304,7 @@ class CentralClientTest {
         accountStatus = 401;
 
         assertThrows(CentralUnavailableException.class, () -> client.updateReceivingAccount(
-                "PRT-1", new ReceivingAccount("002", "4321", "98765-4")));
+                new Protocol("PRT-1"), new ReceivingAccount("002", "4321", "98765-4")));
     }
 
     @Test
@@ -310,7 +312,12 @@ class CentralClientTest {
         accountBody = "{\"banco\":\" \",\"agencia\":\"4321\",\"conta\":\"98765-4\"}";
 
         assertThrows(CentralUnavailableException.class, () -> client.updateReceivingAccount(
-                "PRT-1", new ReceivingAccount("002", "4321", "98765-4")));
+                new Protocol("PRT-1"), new ReceivingAccount("002", "4321", "98765-4")));
+    }
+
+    private static StartPortabilityCommand portabilityCommand() {
+        return new StartPortabilityCommand(new BeneficiaryId("BEN-123"), List.of("INS-1"),
+                "Nova Credora S.A.", new ReceivingAccount("001", "1234", "56789-0"));
     }
 
     private static final String CANONICAL_PORTABILITY_BODY =

@@ -1,8 +1,8 @@
 # PRD — F07 Tratar e exibir rejeições e falhas de integração com a Central
 
 > **Dono:** requisitos de produto desta funcionalidade. Escopo, fases e métricas em
-> [`../../product-brief.md`](../../product-brief.md); termos em [`../../GLOSSARY.md`](../../GLOSSARY.md);
-> status em [`../../roadmap.md`](../../roadmap.md). Spec de origem: PDF do desafio, disponível fora do
+> [`../../product-brief.md`](../../product-brief.md); termos em [`../../GLOSSARY.md`](../../GLOSSARY.md).
+> Spec de origem: PDF do desafio, disponível fora do
 > repositório; ele pede a simulação de rejeição e falhas ocasionais e o tratamento visível dos dois cenários,
 > sem fixar o contrato da Central.
 

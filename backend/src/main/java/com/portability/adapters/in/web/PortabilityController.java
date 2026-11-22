@@ -3,6 +3,7 @@ package com.portability.adapters.in.web;
 import com.portability.adapters.in.web.input.PortabilityRequest;
 import com.portability.adapters.in.web.input.ReceivingAccountRequest;
 import com.portability.adapters.in.web.output.OperationResponse;
+import com.portability.domain.model.OperationId;
 import com.portability.domain.model.PortabilityOperationResult;
 import com.portability.domain.ports.in.GetOperationStatusUseCase;
 import com.portability.domain.ports.in.StartPortabilityUseCase;
@@ -38,19 +39,14 @@ public class PortabilityController {
     @PostMapping
     public ResponseEntity<OperationResponse> start(@RequestBody PortabilityRequest request) {
         request.validate();
-        PortabilityOperationResult result = startPortabilityUseCase.startPortability(
-                request.beneficiaryId(), 
-                request.installmentIds(), 
-                request.creditorAssignee(), 
-                request.account()
-        );
+        PortabilityOperationResult result = startPortabilityUseCase.startPortability(request.toCommand());
         HttpStatus status = result.created() ? HttpStatus.CREATED : HttpStatus.OK;
         return ResponseEntity.status(status).body(OperationResponse.from(result.operation()));
     }
 
     @GetMapping("/{operationId}")
     public ResponseEntity<OperationResponse> getStatus(@PathVariable String operationId) {
-        return ResponseEntity.of(getOperationStatusUseCase.getOperationStatus(operationId)
+        return ResponseEntity.of(getOperationStatusUseCase.getOperationStatus(new OperationId(operationId))
                 .map(OperationResponse::from));
     }
 
@@ -61,7 +57,7 @@ public class PortabilityController {
     ) {
         request.validate();
         return ResponseEntity.of(updateReceivingAccountUseCase
-                .updateReceivingAccount(operationId, request.toAccount())
+                .updateReceivingAccount(new OperationId(operationId), request.toAccount())
                 .map(OperationResponse::from));
     }
 }

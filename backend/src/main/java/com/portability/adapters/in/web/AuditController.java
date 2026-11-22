@@ -1,6 +1,7 @@
 package com.portability.adapters.in.web;
 
 import com.portability.adapters.in.web.output.AuditEventResponse;
+import com.portability.domain.model.OperationId;
 import com.portability.domain.ports.in.GetOperationAuditUseCase;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -22,7 +23,7 @@ public class AuditController {
 
     @GetMapping
     public ResponseEntity<List<AuditEventResponse>> getAuditTrail(@PathVariable String operationId) {
-        return ResponseEntity.of(getOperationAuditUseCase.getAuditTrail(operationId)
+        return ResponseEntity.of(getOperationAuditUseCase.getAuditTrail(new OperationId(operationId))
                 .map(events -> events.stream().map(AuditEventResponse::from).toList()));
     }
 }

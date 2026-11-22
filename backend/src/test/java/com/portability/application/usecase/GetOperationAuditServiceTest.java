@@ -3,9 +3,12 @@ package com.portability.application.usecase;
 import com.portability.application.GetOperationAuditService;
 import com.portability.domain.model.AuditEvent;
 import com.portability.domain.model.AuditEventType;
+import com.portability.domain.model.BeneficiaryId;
 import com.portability.domain.model.InvalidRequestException;
+import com.portability.domain.model.OperationId;
 import com.portability.domain.model.OperationStatus;
 import com.portability.domain.model.PortabilityOperation;
+import com.portability.domain.model.Protocol;
 import com.portability.domain.model.ReceivingAccount;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -19,7 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class GetOperationAuditServiceTest {
 
-    private static final String OPERATION_ID = "OPE-1";
+    private static final OperationId OPERATION_ID = new OperationId("OPE-1");
 
     private TestDoubles.State state;
     private TestDoubles.Operations operations;
@@ -41,11 +44,11 @@ class GetOperationAuditServiceTest {
         operations.seed(operation(), "key");
         Instant occurredAt = Instant.parse("2026-11-22T12:34:56Z");
         auditEvents.append(new AuditEvent("EVT-1", OPERATION_ID, AuditEventType.REQUESTED,
-                "Operação solicitada", occurredAt));
+                "Operation requested", occurredAt));
         auditEvents.append(new AuditEvent("EVT-2", OPERATION_ID, AuditEventType.ACCOUNT_UPDATED,
-                "Conta atualizada", occurredAt.plusSeconds(60)));
-        auditEvents.append(new AuditEvent("EVT-OTHER", "OPE-OTHER", AuditEventType.REQUESTED,
-                "Outra operação", occurredAt));
+                "Account updated", occurredAt.plusSeconds(60)));
+        auditEvents.append(new AuditEvent("EVT-OTHER", new OperationId("OPE-OTHER"), AuditEventType.REQUESTED,
+                "Another operation", occurredAt));
 
         List<AuditEvent> trail = service.getAuditTrail(OPERATION_ID).orElseThrow();
         assertEquals(2, trail.size());
@@ -55,20 +58,21 @@ class GetOperationAuditServiceTest {
 
     @Test
     void mustReturnEmptyWhenOperationDoesNotExist() {
-        assertTrue(service.getAuditTrail("missing").isEmpty());
+        assertTrue(service.getAuditTrail(new OperationId("missing")).isEmpty());
         assertTrue(state.auditEvents.isEmpty());
         assertTrue(metrics.names.isEmpty());
     }
 
     @Test
     void mustRejectBlankOperationIdBeforeConsultingPorts() {
-        assertThrows(InvalidRequestException.class, () -> service.getAuditTrail(" "));
+        assertThrows(InvalidRequestException.class, () -> new OperationId(" "));
         assertTrue(state.auditEvents.isEmpty());
     }
 
     private static PortabilityOperation operation() {
-        return new PortabilityOperation(OPERATION_ID, "BEN-123", List.of("INS-1"), "Nova Credora S.A.",
-                new ReceivingAccount("001", "1234", "56789-0"), OperationStatus.CONFIRMED,
-                "PRT-1", null, Instant.parse("2026-11-22T12:34:56Z"));
+        return new PortabilityOperation(OPERATION_ID, new BeneficiaryId("BEN-123"), List.of("INS-1"),
+                "Nova Credora S.A.", new ReceivingAccount("001", "1234", "56789-0"),
+                OperationStatus.CONFIRMED, new Protocol("PRT-1"), null,
+                Instant.parse("2026-11-22T12:34:56Z"));
     }
 }

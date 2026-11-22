@@ -125,7 +125,7 @@ describe('App', () => {
     cleanup();
   });
 
-  it('deve exibir somente o painel de autorização quando a tela é aberta', () => {
+  it('should display only the authorization panel when the screen opens', () => {
     render(<App />);
 
     expect(screen.getByRole('heading', { name: /portability platform/i })).toBeTruthy();
@@ -136,7 +136,7 @@ describe('App', () => {
     expect(screen.queryByText(/todo:/i)).toBeNull();
   });
 
-  it('the opt-in must be sent when the beneficiary provides their ID and health plan details', async () => {
+  it('should send the opt-in when the beneficiary provides their ID and agreement details', async () => {
     respondWith(authorization);
     render(<App />);
 
@@ -173,7 +173,7 @@ describe('App', () => {
     expect(alert.textContent).toContain('Central indisponível');
   });
 
-  it('deve exibir os painéis de agenda, portabilidade e auditoria quando a autorização é registrada', async () => {
+  it('should display the agenda, portability, and audit panels when the authorization is registered', async () => {
     respondByPath({ '/authorizations': authorization });
     render(<App />);
 
@@ -187,7 +187,7 @@ describe('App', () => {
     expect(screen.getByRole('heading', { name: /auditoria/i })).toBeTruthy();
   });
 
-  it('the authorized beneficiary must be submitted when the schedule is consulted', async () => {
+  it('should submit the authorized beneficiary when the schedule is consulted', async () => {
     respondByPath({ '/authorizations': authorization });
     render(<App />);
     await authorize();
@@ -200,7 +200,7 @@ describe('App', () => {
     });
   });
 
-  it('it must display the agreement, amount, date, and status of the installments queried', async () => {
+  it('should display the agreement, amount, date, and status when installments are queried', async () => {
     respondByPath({ '/authorizations': authorization });
     render(<App />);
     await authorize();
@@ -236,7 +236,7 @@ describe('App', () => {
     expect(alert.textContent).toContain('Beneficiário não autorizado');
   });
 
-  it('must allow selecting only open and future installments', async () => {
+  it('should allow selecting only open and future installments when the schedule is displayed', async () => {
     respondByPath({ '/authorizations': authorization });
     render(<App />);
     await authorize();
@@ -249,7 +249,7 @@ describe('App', () => {
     expect((screen.getByLabelText(/INS-3/) as HTMLInputElement).disabled).toBe(true);
   });
 
-  it('the account, creditor, and selected installments must be submitted when the transaction is recorded', async () => {
+  it('should submit the account, creditor, and selected installments when the transaction is recorded', async () => {
     respondByPath({ '/authorizations': authorization });
     render(<App />);
     await authorize();
@@ -289,7 +289,7 @@ describe('App', () => {
     expect(alert.textContent).toContain('Parcela já portada');
   });
 
-  it('must display the correlationId when the record fails', async () => {
+  it('should display the correlationId when recording fails', async () => {
     respondByPath({ '/authorizations': authorization });
     render(<App />);
     await authorize();
@@ -303,7 +303,7 @@ describe('App', () => {
     expect(alert.textContent).toContain('corr-123');
   });
 
-  it('must display the reason for rejection when the operation is rejected', async () => {
+  it('should display the rejection reason when the operation is rejected', async () => {
     const rejected: PortabilityOperation = {
       operationId: 'OPE-2',
       status: 'REJECTED',
@@ -322,7 +322,7 @@ describe('App', () => {
     expect(alert.textContent).toContain('Convênio bloqueado');
   });
 
-  it('it should display the events when the audit is consulted', async () => {
+  it('should display the events when the audit is consulted', async () => {
     const events: AuditEvent[] = [
       {
         eventId: 'EVT-1',
@@ -352,7 +352,7 @@ describe('App', () => {
     expect(await screen.findByText('Operação solicitada')).toBeTruthy();
   });
 
-  it('should refresh the operation status when consulting status', async () => {
+  it('should refresh the operation status when the status is consulted', async () => {
     respondByPath({
       '/authorizations': authorization,
       '/portability': operation,
@@ -370,7 +370,7 @@ describe('App', () => {
     expect(mockedApiFetch).toHaveBeenCalledWith('/portability/OPE-1');
   });
 
-  it('should display the rejection reason returned by the status consultation', async () => {
+  it('should display the rejection reason when the status consultation returns one', async () => {
     respondByPath({
       '/authorizations': authorization,
       '/portability': operation,
@@ -391,7 +391,7 @@ describe('App', () => {
     expect(await screen.findByText(/motivo da rejeição: convênio bloqueado/i)).toBeTruthy();
   });
 
-  it('must show the integration failure message and keep the operation pending when the status consultation fails', async () => {
+  it('should show the integration failure message and keep the operation pending when the status consultation fails', async () => {
     mockedApiFetch.mockImplementation(async (path) => {
       if (path === '/authorizations') return authorization as never;
       if (path === '/portability') return operation as never;
@@ -411,7 +411,7 @@ describe('App', () => {
     expect(screen.getByText('PENDING')).toBeTruthy();
   });
 
-  it('must display the integration failure event in the audit trail', async () => {
+  it('should display the integration failure event when the audit trail is consulted', async () => {
     const events: AuditEvent[] = [
       {
         eventId: 'EVT-F07',
@@ -455,13 +455,13 @@ describe('App', () => {
     expect(await screen.findByText(/nenhum evento registrado/i)).toBeTruthy();
   });
 
-  it('must not offer account update while the operation is pending', async () => {
+  it('should not offer account update when the operation is pending', async () => {
     await registerOperationWithStatus(operation);
 
     expect(screen.queryByRole('button', { name: /atualizar conta/i })).toBeNull();
   });
 
-  it('must show the update form filled with the current account when the operation is confirmed', async () => {
+  it('should show the update form filled with the current account when the operation is confirmed', async () => {
     await registerOperationWithStatus(confirmedOperation);
 
     await waitForUpdateFormToShowBank('001');
@@ -469,7 +469,7 @@ describe('App', () => {
     expect((screen.getByLabelText(/nova conta/i) as HTMLInputElement).value).toBe('56789-0');
   });
 
-  it('must send the new account and display it after the update', async () => {
+  it('should send the new account and display it when the update succeeds', async () => {
     await registerOperationWithStatus(confirmedOperation, {
       '/portability/OPE-1/receiving-account': updatedOperation,
     });
@@ -489,7 +489,7 @@ describe('App', () => {
     expect(await screen.findByText(/98765-4/)).toBeTruthy();
   });
 
-  it('must display the API error message when the account update fails', async () => {
+  it('should display the API error message when the account update fails', async () => {
     mockedApiFetch.mockImplementation(async (path) => {
       if (path === '/authorizations') return authorization as never;
       if (path === '/portability') return confirmedOperation as never;
@@ -513,7 +513,7 @@ describe('App', () => {
     expect(alert.textContent).toContain('502');
   });
 
-  it('must consult the audit using the registered operation id', async () => {
+  it('should use the registered operation ID when consulting the audit', async () => {
     await registerOperationWithStatus(operation, { '/portability/OPE-1/audit': [] });
     await waitForAuditOperationId('OPE-1');
 
@@ -524,7 +524,7 @@ describe('App', () => {
     });
   });
 
-  it('must display the API error message when the audit consultation fails', async () => {
+  it('should display the API error message when the audit consultation fails', async () => {
     await registerOperationWithStatus(operation);
     await waitForAuditOperationId('OPE-1');
     mockedApiFetch.mockImplementation(async (path) => {
@@ -538,7 +538,7 @@ describe('App', () => {
     expect(alert.textContent).toContain('Operação não encontrada');
   });
 
-  it('must clear the previous trail when a new audit consultation fails', async () => {
+  it('should clear the previous trail when a new audit consultation fails', async () => {
     const events: AuditEvent[] = [
       {
         eventId: 'EVT-1',
@@ -564,7 +564,7 @@ describe('App', () => {
     await waitFor(() => expect(screen.queryByText('Trilha antiga')).toBeNull());
   });
 
-  it('deve exibir os identificadores da simulação já preenchidos quando a tela é aberta', () => {
+  it('should display the pre-filled simulation IDs when the screen opens', () => {
     render(<App />);
 
     expect((screen.getByLabelText(/id do beneficiário/i) as HTMLInputElement).value).toBe('BEN-123');
@@ -572,7 +572,7 @@ describe('App', () => {
     expect(screen.getByText(/valores da simulação/i)).toBeTruthy();
   });
 
-  it('deve enviar os identificadores sem espaços nas bordas quando a autorização é registrada', async () => {
+  it('should send the IDs without surrounding whitespace when the authorization is registered', async () => {
     respondWith(authorization);
     render(<App />);
 
@@ -588,7 +588,7 @@ describe('App', () => {
     });
   });
 
-  it('deve explicar no estado vazio da agenda quando o beneficiário não tem parcelas', async () => {
+  it('should explain the empty schedule state when the beneficiary has no installments', async () => {
     respondByPath({ '/authorizations': authorization });
     render(<App />);
     await authorize();

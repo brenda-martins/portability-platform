@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useState, type SubmitEvent } from 'react';
 import { describeApiError } from '../../api/ApiError';
 import { apiFetch } from '../../api/client';
 import { PanelHeader } from '../../components/PanelHeader';
@@ -35,7 +35,7 @@ export function AuditPanel({ operation }: AuditPanelProps) {
     if (operation) setOperationId(operation.operationId);
   }, [operation]);
 
-  async function handleConsult(event: FormEvent<HTMLFormElement>) {
+  async function handleConsult(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
 
     setEvents([]);

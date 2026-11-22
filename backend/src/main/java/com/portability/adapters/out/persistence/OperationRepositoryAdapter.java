@@ -2,9 +2,12 @@ package com.portability.adapters.out.persistence;
 
 import com.portability.adapters.out.persistence.entity.IdempotencyReservationJpaEntity;
 import com.portability.adapters.out.persistence.entity.OperationJpaEntity;
+import com.portability.domain.model.BeneficiaryId;
 import com.portability.domain.model.ConcurrentOperationException;
 import com.portability.domain.model.DuplicateIdempotencyKeyException;
+import com.portability.domain.model.OperationId;
 import com.portability.domain.model.PortabilityOperation;
+import com.portability.domain.model.Protocol;
 import com.portability.domain.model.ReceivingAccount;
 import com.portability.domain.ports.out.OperationRepository;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -49,12 +52,12 @@ public class OperationRepositoryAdapter implements OperationRepository {
 
     @Override
     public PortabilityOperation save(PortabilityOperation operation) {
-        OperationJpaEntity entity = repository.findById(operation.operationId())
+        OperationJpaEntity entity = repository.findById(operation.operationId().value())
                 .orElseThrow(() -> new ConcurrentOperationException(
-                        "Operação não encontrada: " + operation.operationId()));
+                        "Operation not found: " + operation.operationId().value()));
         if (entity.getVersion() != operation.version()) {
             throw new ConcurrentOperationException(
-                    "Operação alterada por outra requisição; tente novamente");
+                    "Operation changed by another request; please try again");
         }
         applyState(entity, operation);
         return persist(entity);
@@ -67,8 +70,8 @@ public class OperationRepositoryAdapter implements OperationRepository {
     }
 
     @Override
-    public Optional<PortabilityOperation> findById(String operationId) {
-        return repository.findById(operationId).map(OperationRepositoryAdapter::toDomain);
+    public Optional<PortabilityOperation> findById(OperationId operationId) {
+        return repository.findById(operationId.value()).map(OperationRepositoryAdapter::toDomain);
     }
 
     private PortabilityOperation persist(OperationJpaEntity entity) {
@@ -76,33 +79,33 @@ public class OperationRepositoryAdapter implements OperationRepository {
             return toDomain(repository.saveAndFlush(entity));
         } catch (OptimisticLockingFailureException exception) {
             throw new ConcurrentOperationException(
-                    "Operação alterada por outra requisição; tente novamente", exception);
+                    "Operation changed by another request; please try again", exception);
         }
     }
 
     private static void applyState(OperationJpaEntity entity, PortabilityOperation operation) {
-        entity.setOperationId(operation.operationId());
-        entity.setBeneficiaryId(operation.beneficiaryId());
+        entity.setOperationId(operation.operationId().value());
+        entity.setBeneficiaryId(operation.beneficiaryId().value());
         entity.setInstallmentIds(new ArrayList<>(operation.installmentIds()));
         entity.setCreditorAssignee(operation.creditorAssignee());
         entity.setBank(operation.receivingAccount().bank());
         entity.setAgency(operation.receivingAccount().agency());
         entity.setAccount(operation.receivingAccount().account());
         entity.setStatus(operation.status());
-        entity.setProtocol(operation.protocol());
+        entity.setProtocol(operation.protocol() == null ? null : operation.protocol().value());
         entity.setRejectionReason(operation.rejectionReason());
         entity.setRequestedAt(operation.requestedAt());
     }
 
     private static PortabilityOperation toDomain(OperationJpaEntity entity) {
         return new PortabilityOperation(
-                entity.getOperationId(),
-                entity.getBeneficiaryId(),
+                new OperationId(entity.getOperationId()),
+                new BeneficiaryId(entity.getBeneficiaryId()),
                 List.copyOf(entity.getInstallmentIds()),
                 entity.getCreditorAssignee(),
                 new ReceivingAccount(entity.getBank(), entity.getAgency(), entity.getAccount()),
                 entity.getStatus(),
-                entity.getProtocol(),
+                entity.getProtocol() == null ? null : new Protocol(entity.getProtocol()),
                 entity.getRejectionReason(),
                 entity.getRequestedAt(),
                 entity.getVersion());

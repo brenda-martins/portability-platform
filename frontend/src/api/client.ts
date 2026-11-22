@@ -10,7 +10,6 @@ function newCorrelationId(): string {
   return `corr-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
-/** Thin fetch wrapper; feature hooks will be added on top of it. */
 export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const correlationId = newCorrelationId();
   const response = await fetch(`${API_BASE_URL}${path}`, {
@@ -42,7 +41,7 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
         fields = body.fields as Record<string, string>;
       }
     } catch {
-      // Keeps the HTTP status message when the error body is not JSON.
+      // An error body may not be JSON: keep the HTTP status message and throw ApiError below.
     }
     throw new ApiError(message, response.status, responseCorrelationId ?? correlationId, fields);
   }

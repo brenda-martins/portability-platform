@@ -1,6 +1,7 @@
 package com.portability.adapters.in.web;
 
 import com.portability.domain.model.AuditEvent;
+import com.portability.domain.model.OperationId;
 import com.portability.domain.ports.in.GetOperationAuditUseCase;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -33,8 +34,9 @@ class AuditControllerContractTest {
 
     @Test
     void shouldRespond200WithAuditEventsWhenOperationExists() throws Exception {
-        when(getOperationAuditUseCase.getAuditTrail("OPE-1")).thenReturn(Optional.of(List.of(
-                new AuditEvent("EVT-1", "OPE-1", "SOLICITADA", "Operação solicitada com protocolo PRT-1",
+        when(getOperationAuditUseCase.getAuditTrail(new OperationId("OPE-1"))).thenReturn(Optional.of(List.of(
+                new AuditEvent("EVT-1", new OperationId("OPE-1"), "SOLICITADA",
+                        "Operation requested with protocol PRT-1",
                         Instant.parse("2026-11-22T12:34:56Z")))));
 
         mockMvc.perform(get("/api/portability/{operationId}/audit", "OPE-1"))
@@ -43,13 +45,13 @@ class AuditControllerContractTest {
                 .andExpect(jsonPath("$[0].eventId").value("EVT-1"))
                 .andExpect(jsonPath("$[0].operationId").value("OPE-1"))
                 .andExpect(jsonPath("$[0].eventType").value("SOLICITADA"))
-                .andExpect(jsonPath("$[0].message").value("Operação solicitada com protocolo PRT-1"))
+                .andExpect(jsonPath("$[0].message").value("Operation requested with protocol PRT-1"))
                 .andExpect(jsonPath("$[0].occurredAt").value("2026-11-22T12:34:56Z"));
     }
 
     @Test
     void shouldRespond200WithEmptyListWhenOperationHasNoEvents() throws Exception {
-        when(getOperationAuditUseCase.getAuditTrail("OPE-1")).thenReturn(Optional.of(List.of()));
+        when(getOperationAuditUseCase.getAuditTrail(new OperationId("OPE-1"))).thenReturn(Optional.of(List.of()));
 
         mockMvc.perform(get("/api/portability/{operationId}/audit", "OPE-1"))
                 .andExpect(status().isOk())
@@ -58,7 +60,7 @@ class AuditControllerContractTest {
 
     @Test
     void mustRespond404WhenOperationDoesNotExist() throws Exception {
-        when(getOperationAuditUseCase.getAuditTrail("missing")).thenReturn(Optional.empty());
+        when(getOperationAuditUseCase.getAuditTrail(new OperationId("missing"))).thenReturn(Optional.empty());
 
         mockMvc.perform(get("/api/portability/{operationId}/audit", "missing"))
                 .andExpect(status().isNotFound());

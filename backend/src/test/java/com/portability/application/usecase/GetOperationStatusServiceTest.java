@@ -3,11 +3,14 @@ package com.portability.application.usecase;
 import com.portability.application.GetOperationStatusService;
 import com.portability.domain.model.AuditEvent;
 import com.portability.domain.model.AuditEventType;
+import com.portability.domain.model.BeneficiaryId;
 import com.portability.domain.model.CentralOperationStatus;
 import com.portability.domain.model.ConcurrentOperationException;
 import com.portability.domain.model.InvalidRequestException;
+import com.portability.domain.model.OperationId;
 import com.portability.domain.model.OperationStatus;
 import com.portability.domain.model.PortabilityOperation;
+import com.portability.domain.model.Protocol;
 import com.portability.domain.model.ReceivingAccount;
 import com.portability.domain.ports.out.CentralUnavailableException;
 import org.junit.jupiter.api.AfterEach;
@@ -25,8 +28,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class GetOperationStatusServiceTest {
 
-    private static final String OPERATION_ID = "OPE-1";
-    private static final String PROTOCOL = "PRT-OLD";
+    private static final OperationId OPERATION_ID = new OperationId("OPE-1");
+    private static final Protocol PROTOCOL = new Protocol("PRT-OLD");
     private static final String REQUESTED_AT = "2026-11-22T12:34:56Z";
     private static final String NOW = "2026-11-22T12:35:00Z";
 
@@ -46,9 +49,11 @@ class GetOperationStatusServiceTest {
         central = new TestDoubles.Central(state);
         backoff = new TestDoubles.Backoff();
         metrics = new TestDoubles.Metrics();
-        service = new GetOperationStatusService(operations, auditEvents, central, backoff,
-                new TestDoubles.Transactions(state), TestDoubles.fixedClock(NOW),
-                new TestDoubles.Ids(), metrics);
+        var transactions = new TestDoubles.Transactions(state);
+        var ids = new TestDoubles.Ids();
+        var clock = TestDoubles.fixedClock(NOW);
+        service = new GetOperationStatusService(operations, auditEvents, central, backoff, transactions,
+                TestDoubles.failureRecorder(auditEvents, transactions, clock, ids, metrics), clock, ids, metrics);
     }
 
     @AfterEach
@@ -71,7 +76,7 @@ class GetOperationStatusServiceTest {
         assertEquals(1, auditEvents.findByOperationId(OPERATION_ID).size());
         AuditEvent event = auditEvents.findByOperationId(OPERATION_ID).getFirst();
         assertEquals(AuditEventType.CONFIRMED.externalValue(), event.eventType());
-        assertTrue(event.message().contains(PROTOCOL));
+        assertTrue(event.message().startsWith("Operation confirmed by Central with protocol " + PROTOCOL.value()));
         assertTrue(metrics.names.contains("operation.confirmed"));
     }
 
@@ -98,7 +103,8 @@ class GetOperationStatusServiceTest {
         assertEquals("Convênio bloqueado", result.rejectionReason());
         AuditEvent event = auditEvents.findByOperationId(OPERATION_ID).getFirst();
         assertEquals(AuditEventType.REJECTED.externalValue(), event.eventType());
-        assertTrue(event.message().contains(PROTOCOL));
+        assertTrue(event.message().startsWith(
+                "Operation rejected by Central with protocol " + PROTOCOL.value() + ": "));
         assertTrue(event.message().contains("Convênio bloqueado"));
     }
 
@@ -120,14 +126,14 @@ class GetOperationStatusServiceTest {
     @Test
     void mustRecordFailureEventWithoutChangingOperationWhenCentralFails() {
         operations.seed(pending(), "key");
-        central.statusFailure = TestDoubles.centralFailure("Central indisponível");
+        central.statusFailure = TestDoubles.centralFailure("Central unavailable");
 
         assertThrows(CentralUnavailableException.class, () -> service.getOperationStatus(OPERATION_ID));
 
         assertEquals(OperationStatus.PENDING, operations.findById(OPERATION_ID).orElseThrow().status());
         AuditEvent event = auditEvents.findByOperationId(OPERATION_ID).getFirst();
         assertEquals(AuditEventType.INTEGRATION_FAILURE.externalValue(), event.eventType());
-        assertTrue(event.message().contains("Central indisponível"));
+        assertTrue(event.message().contains("Failed to consult status at Central: Central unavailable"));
         assertTrue(metrics.names.contains("operation.integration-failure"));
     }
 
@@ -170,13 +176,13 @@ class GetOperationStatusServiceTest {
 
     @Test
     void mustReturnEmptyWhenOperationDoesNotExist() {
-        assertTrue(service.getOperationStatus("missing").isEmpty());
+        assertTrue(service.getOperationStatus(new OperationId("missing")).isEmpty());
         assertTrue(state.auditEvents.isEmpty());
     }
 
     @Test
     void mustRejectBlankOperationIdBeforeConsultingPorts() {
-        assertThrows(InvalidRequestException.class, () -> service.getOperationStatus(" "));
+        assertThrows(InvalidRequestException.class, () -> new OperationId(" "));
         assertTrue(state.auditEvents.isEmpty());
     }
 
@@ -185,14 +191,14 @@ class GetOperationStatusServiceTest {
     }
 
     private static PortabilityOperation pending() {
-        return new PortabilityOperation(OPERATION_ID, "BEN-123", List.of("INS-1"), "Nova Credora S.A.",
-                new ReceivingAccount("001", "1234", "56789-0"), OperationStatus.PENDING, PROTOCOL, null,
-                Instant.parse(REQUESTED_AT));
+        return new PortabilityOperation(OPERATION_ID, new BeneficiaryId("BEN-123"), List.of("INS-1"),
+                "Nova Credora S.A.", new ReceivingAccount("001", "1234", "56789-0"),
+                OperationStatus.PENDING, PROTOCOL, null, Instant.parse(REQUESTED_AT), 0L);
     }
 
     private static PortabilityOperation terminal(OperationStatus status) {
-        return new PortabilityOperation(OPERATION_ID, "BEN-123", List.of("INS-1"), "Nova Credora S.A.",
-                new ReceivingAccount("001", "1234", "56789-0"), status, PROTOCOL, null,
-                Instant.parse(REQUESTED_AT));
+        return new PortabilityOperation(OPERATION_ID, new BeneficiaryId("BEN-123"), List.of("INS-1"),
+                "Nova Credora S.A.", new ReceivingAccount("001", "1234", "56789-0"),
+                status, PROTOCOL, null, Instant.parse(REQUESTED_AT), 0L);
     }
 }

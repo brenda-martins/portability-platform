@@ -1,9 +1,10 @@
 package com.portability.adapters.in.web;
 
+import com.portability.domain.model.AgreementId;
+import com.portability.domain.model.BeneficiaryId;
 import com.portability.domain.model.BeneficiaryNotAuthorizedException;
 import com.portability.domain.model.DiscountInstallment;
 import com.portability.domain.model.InstallmentStatus;
-import com.portability.domain.model.InvalidRequestException;
 import com.portability.domain.ports.in.GetDiscountAgendaUseCase;
 import com.portability.domain.ports.out.CentralUnavailableException;
 import org.junit.jupiter.api.BeforeEach;
@@ -36,8 +37,8 @@ class AgendaControllerContractTest {
 
     @Test
     void shouldRespond200WithInstallmentsWhenBeneficiaryIsAuthorized() throws Exception {
-        when(getDiscountAgendaUseCase.getAgenda("BEN-123")).thenReturn(List.of(
-                new DiscountInstallment("INS-1", "AGR-001", new BigDecimal("120.50"),
+        when(getDiscountAgendaUseCase.getAgenda(new BeneficiaryId("BEN-123"))).thenReturn(List.of(
+                new DiscountInstallment("INS-1", new AgreementId("AGR-001"), new BigDecimal("120.50"),
                         LocalDate.parse("2099-01-10"), InstallmentStatus.OPEN)));
 
         mockMvc.perform(get("/api/beneficiaries/BEN-123/agenda"))
@@ -51,19 +52,16 @@ class AgendaControllerContractTest {
 
     @Test
     void mustRespond403WhenBeneficiaryIsNotAuthorized() throws Exception {
-        when(getDiscountAgendaUseCase.getAgenda("BEN-999"))
-                .thenThrow(new BeneficiaryNotAuthorizedException("Beneficiário não autorizado"));
+        when(getDiscountAgendaUseCase.getAgenda(new BeneficiaryId("BEN-999")))
+                .thenThrow(new BeneficiaryNotAuthorizedException("Beneficiary not authorized"));
 
         mockMvc.perform(get("/api/beneficiaries/BEN-999/agenda"))
                 .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.message").value("Beneficiário não autorizado"));
+                .andExpect(jsonPath("$.message").value("Beneficiary not authorized"));
     }
 
     @Test
     void shouldRespond400WhenBeneficiaryIdIsBlank() throws Exception {
-        when(getDiscountAgendaUseCase.getAgenda(" "))
-                .thenThrow(new InvalidRequestException("beneficiaryId", "beneficiaryId must not be blank"));
-
         mockMvc.perform(get("/api/beneficiaries/{beneficiaryId}/agenda", " "))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").exists())
@@ -72,11 +70,11 @@ class AgendaControllerContractTest {
 
     @Test
     void mustRespond502WhenCentralFails() throws Exception {
-        when(getDiscountAgendaUseCase.getAgenda("BEN-123"))
-                .thenThrow(new CentralUnavailableException("Central indisponível"));
+        when(getDiscountAgendaUseCase.getAgenda(new BeneficiaryId("BEN-123")))
+                .thenThrow(new CentralUnavailableException("Central unavailable"));
 
         mockMvc.perform(get("/api/beneficiaries/BEN-123/agenda"))
                 .andExpect(status().isBadGateway())
-                .andExpect(jsonPath("$.message").value("Central indisponível"));
+                .andExpect(jsonPath("$.message").value("Central unavailable"));
     }
 }

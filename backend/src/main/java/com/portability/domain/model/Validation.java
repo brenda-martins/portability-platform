@@ -12,6 +12,13 @@ public final class Validation {
     private Validation() {
     }
 
+    public static <T> T requireNonNull(T value, String field) {
+        if (value == null) {
+            throw new InvalidRequestException(field, field + " must not be null");
+        }
+        return value;
+    }
+
     public static String requireNotBlank(String value, String field) {
         if (value == null || value.isBlank()) {
             throw new InvalidRequestException(field, field + " must not be blank");
@@ -51,7 +58,7 @@ public final class Validation {
         for(String installmentId : installmentIds) {
             DiscountInstallment installment = byId.get(installmentId);
             if (installment == null || installment.status() != InstallmentStatus.OPEN || !installment.discountDate().isAfter(today)) {
-                throw new InvalidRequestException("installmentIds", "Parcela inelegível: " + installmentId);
+                throw new InvalidRequestException("installmentIds", "Ineligible installment: " + installmentId);
             }
         }
     }

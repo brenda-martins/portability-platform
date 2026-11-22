@@ -2,6 +2,7 @@ package com.portability.application;
 
 import com.portability.domain.model.AuditEvent;
 import com.portability.domain.model.AuditEventType;
+import com.portability.domain.model.OperationId;
 import com.portability.domain.model.PortabilityOperation;
 import com.portability.domain.model.ReceivingAccount;
 import com.portability.domain.model.Validation;
@@ -23,23 +24,26 @@ public class UpdateReceivingAccountService implements UpdateReceivingAccountUseC
     private final AuditEventRepository auditEventRepository;
     private final CentralPortabilityPort centralPortabilityPort;
     private final TransactionPort transactions;
+    private final IntegrationFailureRecorder failureRecorder;
     private final Clock clock;
     private final IdGenerator ids;
     private final MetricsPort metrics;
 
     public UpdateReceivingAccountService(
         final OperationRepository operationRepository,
-        final AuditEventRepository auditEventRepository, 
+        final AuditEventRepository auditEventRepository,
         final CentralPortabilityPort centralPortabilityPort,
-        final TransactionPort transactions, 
-        final Clock clock, 
-        final IdGenerator ids, 
+        final TransactionPort transactions,
+        final IntegrationFailureRecorder failureRecorder,
+        final Clock clock,
+        final IdGenerator ids,
         final MetricsPort metrics
     ) {
         this.operationRepository = operationRepository;
         this.auditEventRepository = auditEventRepository;
         this.centralPortabilityPort = centralPortabilityPort;
         this.transactions = transactions;
+        this.failureRecorder = failureRecorder;
         this.clock = clock;
         this.ids = ids;
         this.metrics = metrics;
@@ -47,12 +51,11 @@ public class UpdateReceivingAccountService implements UpdateReceivingAccountUseC
 
     @Override
     public Optional<PortabilityOperation> updateReceivingAccount(
-        String operationId,
+        OperationId operationId,
         ReceivingAccount receivingAccount
     ) {
-        Validation.requireNotBlank(operationId, "operationId");
         Validation.requireAccount(receivingAccount);
-       
+
         Optional<PortabilityOperation> found = operationRepository.findById(operationId);
         if (found.isEmpty()) {
             return Optional.empty();
@@ -66,13 +69,7 @@ public class UpdateReceivingAccountService implements UpdateReceivingAccountUseC
         try {
             centralPortabilityPort.updateReceivingAccount(operation.protocol(), receivingAccount);
         } catch (CentralUnavailableException exception) {
-            transactions.inTransaction(() -> {
-                auditEventRepository.append(new AuditEvent(ids.next(), operationId,
-                        AuditEventType.INTEGRATION_FAILURE,
-                        "Falha ao atualizar conta na Central: " + exception.getMessage(), clock.instant()));
-                return null;
-            });
-            metrics.increment("operation.integration-failure");
+            failureRecorder.record(operationId, "Failed to update receiving account at Central", exception);
             throw exception;
         }
 
@@ -80,7 +77,7 @@ public class UpdateReceivingAccountService implements UpdateReceivingAccountUseC
             PortabilityOperation persisted = operationRepository.save(changed);
             auditEventRepository.append(new AuditEvent(ids.next(), operationId,
                     AuditEventType.ACCOUNT_UPDATED,
-                    "Conta de recebimento atualizada para o protocolo " + operation.protocol() + ": "
+                    "Receiving account updated for protocol " + operation.protocol().value() + ": "
                             + receivingAccount.bank() + "/" + receivingAccount.agency() + "/"
                             + receivingAccount.account(),
                     clock.instant()));

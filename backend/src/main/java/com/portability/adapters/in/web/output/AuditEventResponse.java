@@ -14,7 +14,7 @@ public record AuditEventResponse(
     public static AuditEventResponse from(AuditEvent event) {
         return new AuditEventResponse(
                 event.eventId(),
-                event.operationId(),
+                event.operationId().value(),
                 event.eventType(),
                 event.message(),
                 event.occurredAt());

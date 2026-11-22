@@ -1,13 +1,19 @@
 package com.portability.application.usecase;
 
+import com.portability.application.IntegrationFailureRecorder;
+import com.portability.domain.model.AgreementId;
 import com.portability.domain.model.AuditEvent;
 import com.portability.domain.model.Authorization;
+import com.portability.domain.model.BeneficiaryId;
 import com.portability.domain.model.CentralOperationStatus;
 import com.portability.domain.model.ConcurrentOperationException;
 import com.portability.domain.model.DiscountInstallment;
 import com.portability.domain.model.DuplicateIdempotencyKeyException;
+import com.portability.domain.model.OperationId;
 import com.portability.domain.model.PortabilityOperation;
+import com.portability.domain.model.Protocol;
 import com.portability.domain.model.ReceivingAccount;
+import com.portability.domain.model.StartPortabilityCommand;
 import com.portability.domain.ports.out.AuditEventRepository;
 import com.portability.domain.ports.out.AuthorizationRepository;
 import com.portability.domain.ports.out.BackoffPort;
@@ -31,8 +37,8 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 
@@ -44,7 +50,7 @@ final class TestDoubles {
 
     static final class State {
 
-        final Map<String, PortabilityOperation> operations = new LinkedHashMap<>();
+        final Map<OperationId, PortabilityOperation> operations = new LinkedHashMap<>();
         final Map<String, PortabilityOperation> operationsByKey = new LinkedHashMap<>();
         final Set<String> reservations = new LinkedHashSet<>();
         final List<AuditEvent> auditEvents = new ArrayList<>();
@@ -52,7 +58,7 @@ final class TestDoubles {
         final List<String> calls = new ArrayList<>();
 
         Runnable snapshot() {
-            Map<String, PortabilityOperation> operationsCopy = new LinkedHashMap<>(operations);
+            Map<OperationId, PortabilityOperation> operationsCopy = new LinkedHashMap<>(operations);
             Map<String, PortabilityOperation> keysCopy = new LinkedHashMap<>(operationsByKey);
             Set<String> reservationsCopy = new LinkedHashSet<>(reservations);
             List<AuditEvent> eventsCopy = new ArrayList<>(auditEvents);
@@ -108,14 +114,14 @@ final class TestDoubles {
         public void reserveIdempotencyKey(String idempotencyKey) {
             state.calls.add("reserve");
             if (!state.reservations.add(idempotencyKey)) {
-                throw new DuplicateIdempotencyKeyException("Chave de idempotência já reservada");
+                throw new DuplicateIdempotencyKeyException("Idempotency key already reserved");
             }
         }
 
         @Override
         public PortabilityOperation save(PortabilityOperation operation, String idempotencyKey) {
             if (failOnSave) {
-                throw new ConcurrentOperationException("Concorrência ao salvar");
+                throw new ConcurrentOperationException("Concurrent save");
             }
             PortabilityOperation stored = nextVersion(operation);
             state.operations.put(stored.operationId(), stored);
@@ -126,11 +132,11 @@ final class TestDoubles {
         @Override
         public PortabilityOperation save(PortabilityOperation operation) {
             if (failOnSave) {
-                throw new ConcurrentOperationException("Concorrência ao salvar");
+                throw new ConcurrentOperationException("Concurrent save");
             }
             PortabilityOperation current = state.operations.get(operation.operationId());
             if (current == null || current.version() != operation.version()) {
-                throw new ConcurrentOperationException("Versão desatualizada");
+                throw new ConcurrentOperationException("Stale version");
             }
             PortabilityOperation stored = nextVersion(operation);
             state.operations.put(stored.operationId(), stored);
@@ -149,7 +155,7 @@ final class TestDoubles {
         }
 
         @Override
-        public Optional<PortabilityOperation> findById(String operationId) {
+        public Optional<PortabilityOperation> findById(OperationId operationId) {
             return Optional.ofNullable(state.operations.get(operationId));
         }
 
@@ -188,7 +194,7 @@ final class TestDoubles {
         }
 
         @Override
-        public List<AuditEvent> findByOperationId(String operationId) {
+        public List<AuditEvent> findByOperationId(OperationId operationId) {
             return state.auditEvents.stream()
                     .filter(event -> event.operationId().equals(operationId))
                     .toList();
@@ -210,7 +216,8 @@ final class TestDoubles {
         }
 
         @Override
-        public Optional<Authorization> findByBeneficiaryAndAgreement(String beneficiaryId, String agreementId) {
+        public Optional<Authorization> findByBeneficiaryAndAgreement(
+                BeneficiaryId beneficiaryId, AgreementId agreementId) {
             return state.authorizations.stream()
                     .filter(authorization -> authorization.beneficiaryId().equals(beneficiaryId)
                             && authorization.agreementId().equals(agreementId))
@@ -218,7 +225,7 @@ final class TestDoubles {
         }
 
         @Override
-        public boolean existsByBeneficiaryId(String beneficiaryId) {
+        public boolean existsByBeneficiaryId(BeneficiaryId beneficiaryId) {
             return state.authorizations.stream()
                     .anyMatch(authorization -> authorization.beneficiaryId().equals(beneficiaryId));
         }
@@ -230,7 +237,7 @@ final class TestDoubles {
         RuntimeException failure;
 
         @Override
-        public String registerAuthorization(String beneficiaryId, String agreementId) {
+        public String registerAuthorization(BeneficiaryId beneficiaryId, AgreementId agreementId) {
             if (failure != null) {
                 throw failure;
             }
@@ -246,7 +253,7 @@ final class TestDoubles {
             this.state = state;
         }
 
-        String protocol = "PRT-1";
+        Protocol protocol = new Protocol("PRT-1");
         int registrations;
         final Deque<CentralOperationStatus> statuses = new ArrayDeque<>();
         final List<ReceivingAccount> accountUpdates = new ArrayList<>();
@@ -255,8 +262,7 @@ final class TestDoubles {
         RuntimeException accountFailure;
 
         @Override
-        public String registerPortability(String beneficiaryId, List<String> installmentIds,
-                String creditorAssignee, ReceivingAccount receivingAccount) {
+        public Protocol registerPortability(StartPortabilityCommand command) {
             if (registrationFailure != null) {
                 throw registrationFailure;
             }
@@ -266,7 +272,7 @@ final class TestDoubles {
         }
 
         @Override
-        public CentralOperationStatus consultStatus(String protocol) {
+        public CentralOperationStatus consultStatus(Protocol protocol) {
             if (statusFailure != null) {
                 throw statusFailure;
             }
@@ -276,7 +282,7 @@ final class TestDoubles {
         }
 
         @Override
-        public ReceivingAccount updateReceivingAccount(String protocol, ReceivingAccount receivingAccount) {
+        public ReceivingAccount updateReceivingAccount(Protocol protocol, ReceivingAccount receivingAccount) {
             if (accountFailure != null) {
                 throw accountFailure;
             }
@@ -291,7 +297,7 @@ final class TestDoubles {
         RuntimeException failure;
 
         @Override
-        public List<DiscountInstallment> fetchAgenda(String beneficiaryId) {
+        public List<DiscountInstallment> fetchAgenda(BeneficiaryId beneficiaryId) {
             if (failure != null) {
                 throw failure;
             }
@@ -308,7 +314,7 @@ final class TestDoubles {
         public void await(Duration duration) throws InterruptedException {
             delays.add(duration);
             if (interrupt) {
-                throw new InterruptedException("interrompido");
+                throw new InterruptedException("interrupted");
             }
         }
     }
@@ -331,6 +337,11 @@ final class TestDoubles {
         public void increment(String metric) {
             names.add(metric);
         }
+    }
+
+    static IntegrationFailureRecorder failureRecorder(AuditEvents auditEvents, Transactions transactions,
+            Clock clock, Ids ids, Metrics metrics) {
+        return new IntegrationFailureRecorder(auditEvents, transactions, clock, ids, metrics);
     }
 
     static Clock fixedClock(String instant) {

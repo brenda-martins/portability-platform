@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useState, type SubmitEvent } from 'react';
 import { describeApiError } from '../../api/ApiError';
 import { apiFetch } from '../../api/client';
 import { PanelHeader } from '../../components/PanelHeader';
@@ -29,7 +29,7 @@ export function AgendaPanel({
   const [consulted, setConsulted] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function handleConsult(event: FormEvent<HTMLFormElement>) {
+  async function handleConsult(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!authorization) return;
 

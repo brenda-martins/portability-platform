@@ -1,6 +1,10 @@
 package com.portability.adapters.out.central;
 
+import com.portability.domain.model.AgreementId;
+import com.portability.domain.model.BeneficiaryId;
+import com.portability.domain.model.Protocol;
 import com.portability.domain.model.ReceivingAccount;
+import com.portability.domain.model.StartPortabilityCommand;
 import com.portability.domain.ports.out.CentralUnavailableException;
 import org.springframework.stereotype.Component;
 import tools.jackson.core.JacksonException;
@@ -28,19 +32,19 @@ public class CentralRequestCodec {
     public record SignedRequest(String body, String signature) {
     }
 
-    public SignedRequest authorization(String beneficiaryId, String agreementId) {
+    public SignedRequest authorization(BeneficiaryId beneficiaryId, AgreementId agreementId) {
         Map<String, Object> payload = new LinkedHashMap<>();
-        payload.put("beneficiarioId", beneficiaryId);
-        payload.put("convenioId", agreementId);
+        payload.put("beneficiarioId", beneficiaryId.value());
+        payload.put("convenioId", agreementId.value());
         return sign(payload);
     }
 
-    public SignedRequest portability(String beneficiaryId, List<String> installmentIds,
-            String creditorAssignee, ReceivingAccount account) {
+    public SignedRequest portability(StartPortabilityCommand command) {
         Map<String, Object> payload = new LinkedHashMap<>();
-        payload.put("beneficiarioId", beneficiaryId);
-        payload.put("parcelas", installmentIds);
-        payload.put("credorCessionario", creditorAssignee);
+        payload.put("beneficiarioId", command.beneficiaryId().value());
+        payload.put("parcelas", command.installmentIds());
+        payload.put("credorCessionario", command.creditorAssignee());
+        ReceivingAccount account = command.receivingAccount();
         Map<String, String> accountPayload = new LinkedHashMap<>();
         accountPayload.put("banco", account.bank());
         accountPayload.put("agencia", account.agency());
@@ -49,9 +53,9 @@ public class CentralRequestCodec {
         return sign(payload);
     }
 
-    public SignedRequest accountUpdate(String protocol, ReceivingAccount account) {
+    public SignedRequest accountUpdate(Protocol protocol, ReceivingAccount account) {
         Map<String, Object> payload = new LinkedHashMap<>();
-        payload.put("protocolo", protocol);
+        payload.put("protocolo", protocol.value());
         payload.put("banco", account.bank());
         payload.put("agencia", account.agency());
         payload.put("conta", account.account());

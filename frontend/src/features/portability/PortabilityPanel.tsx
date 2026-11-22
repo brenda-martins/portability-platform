@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useState, type SubmitEvent } from 'react';
 import { describeApiError } from '../../api/ApiError';
 import { apiFetch } from '../../api/client';
 import { PanelHeader } from '../../components/PanelHeader';
@@ -39,7 +39,7 @@ export function PortabilityPanel({
     operation?.receivingAccount?.account,
   ]);
 
-  async function handleRegister(event: FormEvent<HTMLFormElement>) {
+  async function handleRegister(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!authorization) return;
 
@@ -63,7 +63,7 @@ export function PortabilityPanel({
     }
   }
 
-  async function handleUpdateAccount(event: FormEvent<HTMLFormElement>) {
+  async function handleUpdateAccount(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!operation) return;
 

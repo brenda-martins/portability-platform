@@ -1,8 +1,7 @@
 # PRD — F02 Consultar e visualizar a agenda de descontos
 
 > **Dono:** requisitos de produto desta funcionalidade. Escopo, fases e métricas em
-> [`../../product-brief.md`](../../product-brief.md); termos em [`../../GLOSSARY.md`](../../GLOSSARY.md);
-> status em [`../../roadmap.md`](../../roadmap.md).
+> [`../../product-brief.md`](../../product-brief.md); termos em [`../../GLOSSARY.md`](../../GLOSSARY.md).
 
 ## Problema
 
