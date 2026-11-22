@@ -283,7 +283,8 @@ memória com `ddl-auto: create-drop`. Mapeamentos de domínio em
 | `requested_at` | Instant (not null) | Momento da solicitação |
 
 As parcelas selecionadas são armazenadas na tabela de coleção `operation_installments`
-(`operation_id`, `installment_id`), mapeada por `@ElementCollection`.
+(`operation_id`, `installment_id`, `position`), mapeada por `@ElementCollection` com `@OrderColumn` para
+preservar a ordem da seleção.
 
 ### `audit_events`
 

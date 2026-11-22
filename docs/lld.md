@@ -77,8 +77,8 @@ A tradução acontece em `adapters/out/central`:
 
 - Entidades JPA em `adapters/out/persistence` são **espelho** do domínio; nunca vazam para ports ou
   respostas HTTP.
-- `OperationJpaEntity` usa `@ElementCollection` para `installmentIds` (tabela `operation_installments`) e
-  `idempotency_key` única para reconhecer reenvios.
+- `OperationJpaEntity` usa `@ElementCollection` + `@OrderColumn` para `installmentIds` (tabela
+  `operation_installments`, coluna `position`) e `idempotency_key` única para reconhecer reenvios.
 - `AuditEventRepositoryAdapter.append` é **append-only**: insert sem update/delete.
 - `findById`/`findByProtocol` e a listagem de eventos permanecem stubs (F04/F06).
 - O datasource padrão usa PostgreSQL (`jdbc:postgresql://localhost:5433/portability`) com

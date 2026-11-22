@@ -9,6 +9,7 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
+import jakarta.persistence.OrderColumn;
 import jakarta.persistence.Table;
 
 import java.time.Instant;
@@ -32,6 +33,7 @@ public class OperationJpaEntity {
     @ElementCollection
     @CollectionTable(name = "operation_installments", joinColumns = @JoinColumn(name = "operation_id"))
     @Column(name = "installment_id")
+    @OrderColumn(name = "position")
     private List<String> installmentIds = new ArrayList<>();
 
     @Column(name = "creditor_assignee")

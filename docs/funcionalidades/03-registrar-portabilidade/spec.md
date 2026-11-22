@@ -91,7 +91,8 @@ estar incluída no próprio conteúdo assinado.
   permanecem inalterados.
 - `OperationRepositoryAdapter` implementa somente `save` e `findByIdempotencyKey`, com conversão
   explícita entre `PortabilityOperation` e `OperationJpaEntity`, incluindo a coleção
-  `operation_installments`. `findById`/`findByProtocol` permanecem stubs de F04.
+  `operation_installments`, com `@OrderColumn` para preservar a ordem da seleção.
+  `findById`/`findByProtocol` permanecem stubs de F04.
 - `AuditEventRepositoryAdapter.append` implementa insert append-only; `findByOperationId` permanece
   stub de F06.
 - `PortabilityController` implementa apenas o `POST`, injetando `StartPortabilityUseCase`; o `GET` de
