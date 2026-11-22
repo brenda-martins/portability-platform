@@ -15,7 +15,7 @@ public class AgendaController {
 
     private final GetDiscountAgendaUseCase getDiscountAgendaUseCase;
 
-    public AgendaController(GetDiscountAgendaUseCase getDiscountAgendaUseCase) {
+    public AgendaController(final GetDiscountAgendaUseCase getDiscountAgendaUseCase) {
         this.getDiscountAgendaUseCase = getDiscountAgendaUseCase;
     }
 

@@ -174,9 +174,10 @@ A hierarquia é **funcionalidade → tarefa**, e cada funcionalidade tem dois do
   `docs/hld.md`, `docs/lld.md` e o README, apontando para eles.
 - **Tarefa:** parte entregável de uma funcionalidade, derivada da spec. É onde entra o trabalho técnico.
   Antes do código, cada tarefa ganha um **plano**, feito pela skill `/plan-task` (quando disponível),
-  aprovado e commitado sozinho no **commit de plano**. Depois disso o plano fica congelado como registro
-  do que foi aprovado: só o usuário o descongela. Uma decisão que se mostrar errada é corrigida na spec,
-  no LLD ou numa tarefa nova. Fora da pasta da funcionalidade, a tarefa é `F<NN>-T<NN>`.
+  aprovado pelo usuário. Depois disso o plano fica congelado como registro do que foi aprovado: só o
+  usuário o descongela. Uma decisão que se mostrar errada é corrigida na spec, no LLD ou numa tarefa
+  nova. Fora da pasta da funcionalidade, a tarefa é `F<NN>-T<NN>`. Versionar o plano em Git só acontece
+  se o usuário pedir expressamente, conforme "Convenções de Git".
 
 Estrutura, numeração e status: `docs/roadmap.md` e `docs/funcionalidades/README.md`.
 O status da funcionalidade mora no roadmap; o da tarefa, no campo `Status` do `tarefa.md`.
@@ -270,12 +271,16 @@ teste não puder ser escrito, explique o motivo antes de implementar.
 
 ## Convenções de Git
 
-- **Branch principal:** `main`. Nunca faça commit direto nela. O repositório local ainda está em
-  `master` sem histórico; alinhar com `main` é decisão do usuário.
+- **Regra absoluta:** o agente **nunca faz commit por iniciativa própria** — nem em `main`, nem em
+  branch de trabalho, nem ao concluir tarefa, rodar testes ou atualizar documentação. `git add` e
+  `git commit` só são executados quando o usuário pedir expressamente **naquela interação**, informando
+  o que deve ser versionado. Autorizações dadas em etapas anteriores não se acumulam.
+- **Branch principal:** `main`. Não crie commit nela sem autorização expressa e específica do usuário.
 - **Branches de trabalho:** `feature/*`, `bugfix/*`, `hotfix/*` e `docs/*`, criadas a partir da principal
-  e integradas por pull request.
-- **Commits:** mensagens curtas e descritivas, focadas no **porquê** da mudança. O plano de uma tarefa é
-  commitado sozinho no commit de plano.
+  e integradas por pull request. A criação da branch também depende de pedido do usuário.
+- **Commits:** quando autorizados, sejam curtos e descritivos, focados no **porquê** da mudança. O plano
+  de uma tarefa, se o usuário pedir para versioná-lo, vai em commit próprio.
+- **Push:** nunca faça push sem autorização expressa do usuário para aquele push.
 - **Merge:** o merge é decisão do usuário. O agente só o faz quando o usuário autoriza expressamente
   aquele PR ou aquela tarefa. Sem autorização expressa, não faça merge; uma negação de `gh pr merge`
   não se contorna por outro caminho.
@@ -317,6 +322,9 @@ prevalece.
    ponteiros nos demais; não registre cada modificação técnica.
 10. **Manter o código simples, legível e sustentável.** Soluções pequenas e óbvias vencem soluções
     clever; complexidade precisa de justificativa escrita.
+11. **Não versionar por conta própria.** Sem pedido expresso do usuário, deixe as mudanças no
+    working tree; não execute `git add`, `git commit`, `git push` nem merge. Concluir a verificação não
+    autoriza commit.
 
 ## Verificação completa
 

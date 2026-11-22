@@ -1,5 +1,6 @@
 package com.portability.adapters.in.web;
 
+import com.portability.adapters.in.web.input.PortabilityRequest;
 import com.portability.domain.model.PortabilityOperation;
 import com.portability.domain.model.PortabilityOperationResult;
 import com.portability.domain.model.ReceivingAccount;
@@ -19,7 +20,7 @@ public class PortabilityController {
 
     private final StartPortabilityUseCase startPortabilityUseCase;
 
-    public PortabilityController(StartPortabilityUseCase startPortabilityUseCase) {
+    public PortabilityController(final StartPortabilityUseCase startPortabilityUseCase) {
         this.startPortabilityUseCase = startPortabilityUseCase;
     }
 

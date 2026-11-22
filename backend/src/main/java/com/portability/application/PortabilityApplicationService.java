@@ -60,8 +60,7 @@ public class PortabilityApplicationService implements RegisterAuthorizationUseCa
             DiscountAgendaPort discountAgendaPort,
             CentralPortabilityPort centralPortabilityPort,
             CentralAuthorizationPort centralAuthorizationPort,
-            SignaturePort signaturePort
-    ) {
+            SignaturePort signaturePort) {
         this.authorizationRepository = authorizationRepository;
         this.operationRepository = operationRepository;
         this.auditEventRepository = auditEventRepository;
@@ -76,15 +75,14 @@ public class PortabilityApplicationService implements RegisterAuthorizationUseCa
         requireNotBlank(beneficiaryId, "beneficiaryId");
         requireNotBlank(agreementId, "agreementId");
 
-        Optional<Authorization> existing =
-                authorizationRepository.findByBeneficiaryAndAgreement(beneficiaryId, agreementId);
+        Optional<Authorization> existing = authorizationRepository.findByBeneficiaryAndAgreement(beneficiaryId,
+                agreementId);
         if (existing.isPresent()) {
             return new AuthorizationResult(existing.get(), false);
         }
 
         String authorizationId = centralAuthorizationPort.registerAuthorization(beneficiaryId, agreementId);
-        Authorization authorization =
-                new Authorization(authorizationId, beneficiaryId, agreementId, Instant.now());
+        Authorization authorization = new Authorization(authorizationId, beneficiaryId, agreementId, Instant.now());
         return new AuthorizationResult(authorizationRepository.save(authorization), true);
     }
 
@@ -102,8 +100,7 @@ public class PortabilityApplicationService implements RegisterAuthorizationUseCa
             String beneficiaryId,
             List<String> installmentIds,
             String creditorAssignee,
-            ReceivingAccount receivingAccount
-    ) {
+            ReceivingAccount receivingAccount) {
         requireNotBlank(beneficiaryId, "beneficiaryId");
         requireNotBlank(creditorAssignee, "creditorAssignee");
         requireAccount(receivingAccount);
@@ -145,7 +142,8 @@ public class PortabilityApplicationService implements RegisterAuthorizationUseCa
 
     @Override
     public Optional<PortabilityOperation> getOperationStatus(String operationId) {
-        // TODO: read local state and poll the Central when the operation is still pending.
+        // TODO: read local state and poll the Central when the operation is still
+        // pending.
         throw new UnsupportedOperationException("TODO: getOperationStatus");
     }
 
@@ -177,7 +175,7 @@ public class PortabilityApplicationService implements RegisterAuthorizationUseCa
     }
 
     private static void requireEligibleInstallments(List<String> installmentIds,
-                                                    List<DiscountInstallment> agenda) {
+            List<DiscountInstallment> agenda) {
         Map<String, DiscountInstallment> byId = agenda.stream()
                 .collect(Collectors.toMap(DiscountInstallment::installmentId, Function.identity(),
                         (first, ignored) -> first));
@@ -192,7 +190,7 @@ public class PortabilityApplicationService implements RegisterAuthorizationUseCa
     }
 
     private static String idempotencyKey(String beneficiaryId, List<String> installmentIds,
-                                         String creditorAssignee, ReceivingAccount account) {
+            String creditorAssignee, ReceivingAccount account) {
         String canonical = String.join("|",
                 beneficiaryId,
                 String.join(",", installmentIds.stream().sorted().toList()),

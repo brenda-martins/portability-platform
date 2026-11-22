@@ -1,5 +1,6 @@
 package com.portability.adapters.in.web;
 
+import com.portability.adapters.in.web.input.AuthorizeRequest;
 import com.portability.domain.model.Authorization;
 import com.portability.domain.model.AuthorizationResult;
 import com.portability.domain.ports.in.RegisterAuthorizationUseCase;
@@ -17,7 +18,7 @@ public class AuthorizationController {
 
     private final RegisterAuthorizationUseCase registerAuthorizationUseCase;
 
-    public AuthorizationController(RegisterAuthorizationUseCase registerAuthorizationUseCase) {
+    public AuthorizationController(final RegisterAuthorizationUseCase registerAuthorizationUseCase) {
         this.registerAuthorizationUseCase = registerAuthorizationUseCase;
     }
 

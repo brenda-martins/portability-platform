@@ -29,15 +29,16 @@ docs/funcionalidades/<NN>-<titulo>/
 | Requisitos de produto de uma funcionalidade | `prd.md` |
 | Decisões de implementação e teste | `spec.md` |
 | Status da tarefa | campo `Status` no `tarefa.md` |
-| Plano aprovado | `plano.md` (congelado no commit de plano) |
+| Plano aprovado | `plano.md` (congelado depois da aprovação) |
 
 ## Regras
 
 - O `prd.md` aponta para `docs/product-brief.md` em vez de repetir métricas e requisitos do produto.
 - A `spec.md` segue `docs/hld.md`, `docs/lld.md` e o README, apontando para eles.
-- Antes do código, cada tarefa ganha um `plano.md`, aprovado e commitado **sozinho** no commit de plano.
-  Depois disso o plano fica congelado: só o usuário o descongela. Decisões que se mostrarem erradas são
-  corrigidas na spec, no LLD ou numa tarefa nova — nunca reescrevendo o plano aprovado.
+- Antes do código, cada tarefa ganha um `plano.md`, aprovado pelo usuário. Depois disso o plano fica
+  congelado: só o usuário o descongela. Decisões que se mostrarem erradas são corrigidas na spec, no LLD
+  ou numa tarefa nova — nunca reescrevendo o plano aprovado. Versionar o plano em Git exige pedido
+  expresso do usuário; regras de commit em [`../../AGENTS.md`](../../AGENTS.md), seção "Convenções de Git".
 - A pasta da tarefa recebe só a tarefa, o plano e registros da própria tarefa (roteiro de teste manual,
   medição, captura de validação visual), em Markdown ou imagem com nome kebab-case. Código, fixtures e
   configuração ficam no projeto a que pertencem (`backend/` ou `frontend/`).

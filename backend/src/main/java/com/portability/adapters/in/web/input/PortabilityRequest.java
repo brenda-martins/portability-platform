@@ -1,4 +1,4 @@
-package com.portability.adapters.in.web;
+package com.portability.adapters.in.web.input;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
