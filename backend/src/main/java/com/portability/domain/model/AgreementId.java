@@ -5,9 +5,4 @@ public record AgreementId(String value) {
     public AgreementId {
         Validation.requireNotBlank(value, "agreementId");
     }
-
-    @Override
-    public String toString() {
-        return value;
-    }
 }

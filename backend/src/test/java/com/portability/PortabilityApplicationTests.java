@@ -9,6 +9,6 @@ import org.springframework.test.context.ActiveProfiles;
 class PortabilityApplicationTests {
 
     @Test
-    void contextLoads() {
+    void shouldLoadApplicationContext() {
     }
 }

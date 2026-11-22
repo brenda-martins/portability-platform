@@ -21,7 +21,7 @@ class MockCentralReceivingAccountTest {
             new MockCentralController(signatureService, new ObjectMapper());
 
     @Test
-    void mustAcceptSignedAccountUpdateForRegisteredProtocol() {
+    void shouldAcceptSignedAccountUpdateWhenProtocolIsRegistered() {
         String protocol = registerPortability("BEN-F05-ACCEPT");
         String canonical = canonicalAccount(protocol, "002", "4321", "98765-4");
         String signature = signatureService.sign(canonical);
@@ -41,7 +41,7 @@ class MockCentralReceivingAccountTest {
     }
 
     @Test
-    void mustRespond404WhenProtocolIsUnknown() {
+    void shouldRespond404WhenProtocolIsUnknown() {
         String protocol = "PRT-F05-UNKNOWN";
         String canonical = canonicalAccount(protocol, "002", "4321", "98765-4");
         String signature = signatureService.sign(canonical);
@@ -55,7 +55,7 @@ class MockCentralReceivingAccountTest {
     }
 
     @Test
-    void mustRespond401WhenSignatureIsInvalid() {
+    void shouldRespond401WhenSignatureIsInvalid() {
         String protocol = registerPortability("BEN-F05-SIGNATURE");
         String canonical = canonicalAccount(protocol, "002", "4321", "98765-4");
 
@@ -67,7 +67,7 @@ class MockCentralReceivingAccountTest {
     }
 
     @Test
-    void mustRespond400WhenAccountIsIncomplete() {
+    void shouldRespond400WhenAccountIsIncomplete() {
         String protocol = registerPortability("BEN-F05-INVALID");
         String canonical = canonicalAccount(protocol, "002", " ", "98765-4");
         String signature = signatureService.sign(canonical);

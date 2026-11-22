@@ -19,7 +19,7 @@ class MockCentralStatusTest {
             new MockCentralController(signatureService, new ObjectMapper());
 
     @Test
-    void mustKeepPendingWithRetryAfterForTheFirstTwoConsultations() {
+    void shouldKeepPendingWithRetryAfterWhenConsultedTheFirstTwoTimes() {
         String protocol = registerPortability("BEN-F04-PENDING");
 
         ResponseEntity<?> first = controller.getStatus(protocol);
@@ -32,7 +32,7 @@ class MockCentralStatusTest {
     }
 
     @Test
-    void mustConfirmFromTheThirdConsultationOnward() {
+    void shouldConfirmWhenConsultedFromTheThirdTimeOnward() {
         String protocol = registerPortability("BEN-F04-CONFIRMED");
         controller.getStatus(protocol);
         controller.getStatus(protocol);
@@ -46,7 +46,7 @@ class MockCentralStatusTest {
     }
 
     @Test
-    void mustRespond404WhenProtocolIsUnknown() {
+    void shouldRespond404WhenProtocolIsUnknown() {
         ResponseEntity<?> response = controller.getStatus("PRT-F04-UNKNOWN");
 
         assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());

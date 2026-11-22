@@ -2,7 +2,8 @@
 
 > **Dono:** decisões de implementação e teste desta funcionalidade. Requisitos em [`prd.md`](prd.md);
 > fluxo em [`../../hld.md`](../../hld.md), convenções de ports/mapeamento em
-> [`../../lld.md`](../../lld.md), contratos HTTP em [`../../README.md`](../../README.md).
+> [`../../lld.md`](../../lld.md), contratos HTTP e idioma das mensagens em
+> [`../../README.md`](../../README.md), seção "Documentação da API".
 
 ## Escopo
 

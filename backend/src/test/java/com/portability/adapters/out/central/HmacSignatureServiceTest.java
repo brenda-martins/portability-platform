@@ -19,7 +19,7 @@ class HmacSignatureServiceTest {
     private final HmacSignatureService service = new HmacSignatureService(SECRET);
 
     @Test
-    void mustSubscribePayloadComHmacSha256EmBase64() throws Exception {
+    void shouldSignPayloadWithHmacSha256InBase64() throws Exception {
         assertEquals(expectedSignature(PAYLOAD), service.sign(PAYLOAD));
     }
 

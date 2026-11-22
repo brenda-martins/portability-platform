@@ -52,7 +52,7 @@ class UpdateReceivingAccountServiceTest {
     }
 
     @Test
-    void mustUpdateAccountCallCentralAndAppendEventWhenConfirmed() {
+    void shouldUpdateAccountCallCentralAndAppendEventWhenConfirmed() {
         operations.seed(operation(OperationStatus.CONFIRMED), "key");
         ReceivingAccount newAccount = new ReceivingAccount("002", "4321", "98765-4");
 
@@ -68,7 +68,7 @@ class UpdateReceivingAccountServiceTest {
     }
 
     @Test
-    void mustNotCallCentralOrAppendEventWhenAccountIsUnchanged() {
+    void shouldNotCallCentralOrAppendEventWhenAccountIsUnchanged() {
         ReceivingAccount original = new ReceivingAccount("001", "1234", "56789-0");
         operations.seed(operation(OperationStatus.CONFIRMED), "key");
 
@@ -80,7 +80,7 @@ class UpdateReceivingAccountServiceTest {
     }
 
     @Test
-    void mustRejectAccountUpdateWhenOperationIsPending() {
+    void shouldRejectAccountUpdateWhenOperationIsPending() {
         operations.seed(operation(OperationStatus.PENDING), "key");
 
         OperationNotConfirmedException error = assertThrows(OperationNotConfirmedException.class,
@@ -91,7 +91,7 @@ class UpdateReceivingAccountServiceTest {
     }
 
     @Test
-    void mustRejectAccountUpdateWhenOperationIsRejected() {
+    void shouldRejectAccountUpdateWhenOperationIsRejected() {
         operations.seed(operation(OperationStatus.REJECTED), "key");
 
         assertThrows(OperationNotConfirmedException.class,
@@ -100,13 +100,13 @@ class UpdateReceivingAccountServiceTest {
     }
 
     @Test
-    void mustReturnEmptyWhenOperationDoesNotExist() {
+    void shouldReturnEmptyWhenOperationDoesNotExist() {
         assertTrue(service.updateReceivingAccount(new OperationId("missing"), newAccount()).isEmpty());
         assertTrue(state.auditEvents.isEmpty());
     }
 
     @Test
-    void mustRecordFailureEventWithoutChangingAccountWhenCentralFails() {
+    void shouldRecordFailureEventWithoutChangingAccountWhenCentralFails() {
         operations.seed(operation(OperationStatus.CONFIRMED), "key");
         central.accountFailure = TestDoubles.centralFailure("Central unavailable");
 
@@ -121,7 +121,7 @@ class UpdateReceivingAccountServiceTest {
     }
 
     @Test
-    void mustRollBackAccountChangeAndEventWhenSaveReportsConcurrency() {
+    void shouldRollBackAccountChangeAndEventWhenSaveReportsConcurrency() {
         operations.seed(operation(OperationStatus.CONFIRMED), "key");
         operations.failOnSave = true;
 
@@ -134,7 +134,7 @@ class UpdateReceivingAccountServiceTest {
     }
 
     @Test
-    void mustRejectBlankAccountBeforeTouchingOperationOrCentral() {
+    void shouldRejectBlankAccountBeforeTouchingOperationOrCentral() {
         InvalidRequestException error = assertThrows(InvalidRequestException.class,
                 () -> service.updateReceivingAccount(OPERATION_ID,
                         new ReceivingAccount("001", " ", "56789-0")));

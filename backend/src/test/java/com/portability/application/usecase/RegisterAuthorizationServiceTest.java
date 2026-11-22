@@ -42,7 +42,7 @@ class RegisterAuthorizationServiceTest {
     }
 
     @Test
-    void mustRegisterAndPersistAuthorizationWhenPairIsNew() {
+    void shouldRegisterAndPersistAuthorizationWhenPairIsNew() {
         AuthorizationResult result = service.registerAuthorization(BENEFICIARY, AGREEMENT);
 
         assertTrue(result.created());
@@ -54,7 +54,7 @@ class RegisterAuthorizationServiceTest {
     }
 
     @Test
-    void mustReuseExistingAuthorizationWithoutCallingCentralWhenResent() {
+    void shouldReuseExistingAuthorizationWithoutCallingCentralWhenResent() {
         Authorization existing = new Authorization("AUT-OLD", BENEFICIARY, AGREEMENT,
                 Instant.parse("2026-01-01T00:00:00Z"));
         authorizations.save(existing);
@@ -68,7 +68,7 @@ class RegisterAuthorizationServiceTest {
     }
 
     @Test
-    void mustRejectBlankBeneficiaryBeforeTouchingPorts() {
+    void shouldRejectBlankBeneficiaryBeforeTouchingPorts() {
         InvalidRequestException error = assertThrows(InvalidRequestException.class,
                 () -> new BeneficiaryId(" "));
 
@@ -78,7 +78,7 @@ class RegisterAuthorizationServiceTest {
     }
 
     @Test
-    void mustNotPersistAuthorizationWhenCentralFails() {
+    void shouldNotPersistAuthorizationWhenCentralFails() {
         central.failure = TestDoubles.centralFailure("Central unavailable");
 
         assertThrows(CentralUnavailableException.class,

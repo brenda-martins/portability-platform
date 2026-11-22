@@ -18,7 +18,7 @@ class MockCentralFailureScenariosTest {
             new MockCentralController(signatureService, new ObjectMapper());
 
     @Test
-    void mustRejectWhenCreditorContainsRejectionMarker() {
+    void shouldRejectWhenCreditorContainsRejectionMarker() {
         String protocol = registerPortability("BEN-F07-REJECT", "Nova Credora REJEITAR S.A.");
 
         assertEquals(HttpStatus.NO_CONTENT, controller.getStatus(protocol).getStatusCode());
@@ -32,7 +32,7 @@ class MockCentralFailureScenariosTest {
     }
 
     @Test
-    void mustRespondServiceUnavailableOnEveryConsultationWhenCreditorContainsFailureMarker() {
+    void shouldRespondServiceUnavailableWhenCreditorContainsFailureMarker() {
         String protocol = registerPortability("BEN-F07-FAIL", "Nova Credora FALHA S.A.");
 
         ResponseEntity<?> first = controller.getStatus(protocol);
@@ -45,7 +45,7 @@ class MockCentralFailureScenariosTest {
     }
 
     @Test
-    void mustMatchMarkersIgnoringCase() {
+    void shouldMatchMarkersIgnoringCase() {
         String protocol = registerPortability("BEN-F07-LOWER", "nova credora rejeitar s.a.");
         controller.getStatus(protocol);
         controller.getStatus(protocol);

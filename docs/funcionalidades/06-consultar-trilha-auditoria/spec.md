@@ -2,7 +2,8 @@
 
 > **Dono:** decisões de implementação e teste desta funcionalidade. Requisitos em [`prd.md`](prd.md);
 > fluxo em [`../../hld.md`](../../hld.md), convenções de ports/mapeamento em
-> [`../../lld.md`](../../lld.md), contratos HTTP em [`../../README.md`](../../README.md).
+> [`../../lld.md`](../../lld.md), contratos HTTP e idioma das mensagens em
+> [`../../README.md`](../../README.md), seção "Documentação da API".
 
 ## Escopo
 
@@ -40,9 +41,9 @@ nem parâmetros de consulta.
 
 ## Decisões de implementação
 
-- `GetOperationAuditService` valida o `operationId`, verifica a existência da operação com
-  `OperationRepository.findById` e delega a leitura a `AuditEventRepository`. A verificação evita
-  confundir "operação inexistente" com "operação sem eventos". A consulta não chama a Central nem grava,
+- `GetOperationAuditService` recebe o `OperationId` validado no construtor do value object, verifica a
+  existência da operação com `OperationRepository.findById` e delega a leitura a `AuditEventRepository`.
+  A verificação evita confundir "operação inexistente" com "operação sem eventos". A consulta não chama a Central nem grava,
   e registra métrica no seam.
 - `AuditEventRepositoryAdapter.findByOperationId` usa
   `SpringDataAuditEventRepository.findByOperationIdOrderByOccurredAtAsc`, já existente, e converte cada
@@ -60,7 +61,7 @@ nem parâmetros de consulta.
 
 - `GetOperationAuditServiceTest`: trilha devolvida na íntegra para operação existente, sem chamadas à
   Central nem `append`; `Optional.empty()` para operação inexistente, sem consultar eventos; ID em branco
-  rejeitado antes de qualquer port.
+  rejeitado no construtor do value object.
 - `AuditEventRepositoryAdapterTest`: leitura por operação devolve somente os eventos daquela operação,
   convertidos para o domínio e ordenados por `occurredAt`; a ordem entre eventos com o mesmo instante não
   é verificada.

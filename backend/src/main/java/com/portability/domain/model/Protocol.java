@@ -5,9 +5,4 @@ public record Protocol(String value) {
     public Protocol {
         Validation.requireNotBlank(value, "protocol");
     }
-
-    @Override
-    public String toString() {
-        return value;
-    }
 }

@@ -41,7 +41,7 @@ class GetDiscountAgendaServiceTest {
     }
 
     @Test
-    void mustReturnFullAgendaWhenBeneficiaryIsAuthorized() {
+    void shouldReturnFullAgendaWhenBeneficiaryIsAuthorized() {
         authorize();
         List<DiscountInstallment> installments = List.of(installment("INS-1", InstallmentStatus.OPEN),
                 installment("INS-3", InstallmentStatus.PORTED));
@@ -52,21 +52,21 @@ class GetDiscountAgendaServiceTest {
     }
 
     @Test
-    void mustRejectAgendaWhenBeneficiaryHasNoOptIn() {
+    void shouldRejectAgendaWhenBeneficiaryHasNoOptIn() {
         assertThrows(BeneficiaryNotAuthorizedException.class, () -> service.getAgenda(BENEFICIARY));
 
         assertTrue(metrics.names.isEmpty());
     }
 
     @Test
-    void mustRejectBlankBeneficiaryBeforeConsultingPorts() {
+    void shouldRejectBlankBeneficiaryBeforeConsultingPorts() {
         assertThrows(InvalidRequestException.class, () -> new BeneficiaryId(" "));
 
         assertTrue(metrics.names.isEmpty());
     }
 
     @Test
-    void mustPropagateCentralFailureWithoutPartialAgenda() {
+    void shouldPropagateCentralFailureWithoutPartialAgenda() {
         authorize();
         agenda.failure = TestDoubles.centralFailure("Central unavailable");
 

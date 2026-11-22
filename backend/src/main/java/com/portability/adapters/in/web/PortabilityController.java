@@ -5,6 +5,7 @@ import com.portability.adapters.in.web.input.ReceivingAccountRequest;
 import com.portability.adapters.in.web.output.OperationResponse;
 import com.portability.domain.model.OperationId;
 import com.portability.domain.model.PortabilityOperationResult;
+import com.portability.domain.model.ReceivingAccount;
 import com.portability.domain.ports.in.GetOperationStatusUseCase;
 import com.portability.domain.ports.in.StartPortabilityUseCase;
 import com.portability.domain.ports.in.UpdateReceivingAccountUseCase;
@@ -38,8 +39,8 @@ public class PortabilityController {
 
     @PostMapping
     public ResponseEntity<OperationResponse> start(@RequestBody PortabilityRequest request) {
-        request.validate();
-        PortabilityOperationResult result = startPortabilityUseCase.startPortability(request.toCommand());
+        ReceivingAccount account = request.validate();
+        PortabilityOperationResult result = startPortabilityUseCase.startPortability(request.toCommand(account));
         HttpStatus status = result.created() ? HttpStatus.CREATED : HttpStatus.OK;
         return ResponseEntity.status(status).body(OperationResponse.from(result.operation()));
     }

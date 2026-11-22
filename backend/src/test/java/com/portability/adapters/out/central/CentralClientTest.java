@@ -134,7 +134,7 @@ class CentralClientTest {
     }
 
     @Test
-    void mustSendSignedPayloadAndUseIdReturnedByCentral() throws Exception {
+    void shouldSendSignedPayloadAndUseIdReturnedByCentral() throws Exception {
         String authorizationId = client.registerAuthorization(
                 new BeneficiaryId("BEN-123"), new AgreementId("AGR-001"));
 
@@ -188,7 +188,7 @@ class CentralClientTest {
     }
 
     @Test
-    void mustSendCanonicalBodySignedAndReturnProtocol() throws Exception {
+    void shouldSendCanonicalBodySignedAndReturnProtocol() throws Exception {
         Protocol protocol = client.registerPortability(portabilityCommand());
 
         assertEquals(new Protocol("PRT-1"), protocol);
@@ -217,7 +217,7 @@ class CentralClientTest {
     }
 
     @Test
-    void mustTranslatePendingStatusAndRetryAfterWithoutSendingSignature() {
+    void shouldTranslatePendingStatusAndRetryAfterWithoutSendingSignature() {
         statusCode = 204;
         statusRetryAfter = "2";
 
@@ -230,7 +230,7 @@ class CentralClientTest {
     }
 
     @Test
-    void mustTranslateConfirmedStatusFromCentral() {
+    void shouldTranslateConfirmedStatusFromCentral() {
         statusCode = 200;
         statusBody = "{\"status\":\"CONFIRMADA\",\"motivoRejeicao\":null}";
 
@@ -241,7 +241,7 @@ class CentralClientTest {
     }
 
     @Test
-    void mustTranslateRejectionReasonFromCentral() {
+    void shouldTranslateRejectionReasonFromCentral() {
         statusCode = 200;
         statusBody = "{\"status\":\"REJEITADA\",\"motivoRejeicao\":\"Convênio bloqueado\"}";
 
@@ -283,7 +283,7 @@ class CentralClientTest {
     }
 
     @Test
-    void mustSendSignedPutWithProtocolAndReturnUpdatedAccount() throws Exception {
+    void shouldSendSignedPutWithProtocolAndReturnUpdatedAccount() throws Exception {
         ReceivingAccount updated = client.updateReceivingAccount(
                 new Protocol("PRT-1"), new ReceivingAccount("002", "4321", "98765-4"));
 

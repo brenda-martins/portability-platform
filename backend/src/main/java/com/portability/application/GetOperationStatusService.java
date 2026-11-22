@@ -104,12 +104,6 @@ public class GetOperationStatusService implements GetOperationStatusUseCase {
             }
 
             StatusOutcome outcome = OUTCOMES.get(central.status());
-            if (outcome == null) {
-                CentralUnavailableException exception =
-                        new CentralUnavailableException("Unexpected response from Central");
-                failureRecorder.record(operationId, "Failed to interpret status from Central", exception);
-                throw exception;
-            }
 
             PortabilityOperation transitioned = current.transitionTo(central.status(), central.rejectionReason());
             PortabilityOperation saved = transactions.inTransaction(() -> {

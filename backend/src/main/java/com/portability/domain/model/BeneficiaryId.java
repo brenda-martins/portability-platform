@@ -5,9 +5,4 @@ public record BeneficiaryId(String value) {
     public BeneficiaryId {
         Validation.requireNotBlank(value, "beneficiaryId");
     }
-
-    @Override
-    public String toString() {
-        return value;
-    }
 }

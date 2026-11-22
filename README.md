@@ -184,8 +184,8 @@ operação não confirmada, versão desatualizada ou par beneficiário+convênio
 Central. O frontend gera e envia `X-Correlation-Id` em toda chamada e exibe o `correlationId` recebido
 na mensagem de erro. O registro reserva a chave de idempotência antes de chamar a Central: reenvios
 concorrentes da mesma solicitação devolvem `200` com a operação existente, sem gerar novo protocolo.
-Mensagens de erro e mensagens de eventos de auditoria da API da aplicação são em inglês; os valores de
-`eventType` e os payloads da Central permanecem em pt-BR, conforme o PDF imutável.
+**Idioma das mensagens:** os campos `message` de erros e de eventos de auditoria da API `/api` são sempre
+em inglês. Os valores de `eventType` e os payloads da Central permanecem em pt-BR, conforme o PDF imutável.
 
 ### Central de Convênios simulada (`/central`)
 

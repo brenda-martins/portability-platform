@@ -15,16 +15,15 @@ public record PortabilityRequest(
         String creditorAssignee,
         ReceivingAccountRequest receivingAccount
 ) {
-    public void validate() {
+    public ReceivingAccount validate() {
         Validation.requireNotBlank(beneficiaryId, "beneficiaryId");
         Validation.requireNotBlank(creditorAssignee, "creditorAssignee");
         Validation.requireSelection(installmentIds);
-        account();
+        return account();
     }
 
-    public StartPortabilityCommand toCommand() {
-        return new StartPortabilityCommand(
-                new BeneficiaryId(beneficiaryId), installmentIds, creditorAssignee, account());
+    public StartPortabilityCommand toCommand(ReceivingAccount account) {
+        return new StartPortabilityCommand(new BeneficiaryId(beneficiaryId), installmentIds, creditorAssignee, account);
     }
 
     private ReceivingAccount account() {

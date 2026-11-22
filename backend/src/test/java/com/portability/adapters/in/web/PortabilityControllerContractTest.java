@@ -125,7 +125,7 @@ class PortabilityControllerContractTest {
     }
 
     @Test
-    void mustRespond403WhenBeneficiaryIsNotAuthorized() throws Exception {
+    void shouldRespond403WhenBeneficiaryIsNotAuthorized() throws Exception {
         when(startPortabilityUseCase.startPortability(command()))
                 .thenThrow(new BeneficiaryNotAuthorizedException("Beneficiary not authorized"));
 
@@ -137,7 +137,7 @@ class PortabilityControllerContractTest {
     }
 
     @Test
-    void mustRespond502WhenCentralFails() throws Exception {
+    void shouldRespond502WhenCentralFails() throws Exception {
         when(startPortabilityUseCase.startPortability(command()))
                 .thenThrow(new CentralUnavailableException("Central unavailable"));
 
@@ -167,7 +167,7 @@ class PortabilityControllerContractTest {
     }
 
     @Test
-    void mustRespond502WhenCentralFailsDuringStatusConsultation() throws Exception {
+    void shouldRespond502WhenCentralFailsDuringStatusConsultation() throws Exception {
         when(getOperationStatusUseCase.getOperationStatus(new OperationId("OPE-1")))
                 .thenThrow(new CentralUnavailableException("Central unavailable"));
 
@@ -177,7 +177,7 @@ class PortabilityControllerContractTest {
     }
 
     @Test
-    void mustRespond409WhenConcurrentUpdateWins() throws Exception {
+    void shouldRespond409WhenConcurrentUpdateWins() throws Exception {
         when(getOperationStatusUseCase.getOperationStatus(new OperationId("OPE-1")))
                 .thenThrow(new OptimisticLockingFailureException("stale version"));
 
@@ -228,7 +228,7 @@ class PortabilityControllerContractTest {
     }
 
     @Test
-    void mustRespond409WhenOperationIsNotConfirmed() throws Exception {
+    void shouldRespond409WhenOperationIsNotConfirmed() throws Exception {
         when(updateReceivingAccountUseCase.updateReceivingAccount(new OperationId("OPE-1"),
                 new ReceivingAccount("002", "4321", "98765-4")))
                 .thenThrow(new OperationNotConfirmedException(
@@ -243,7 +243,7 @@ class PortabilityControllerContractTest {
     }
 
     @Test
-    void mustRespond502WhenCentralFailsDuringAccountUpdate() throws Exception {
+    void shouldRespond502WhenCentralFailsDuringAccountUpdate() throws Exception {
         when(updateReceivingAccountUseCase.updateReceivingAccount(new OperationId("OPE-1"),
                 new ReceivingAccount("002", "4321", "98765-4")))
                 .thenThrow(new CentralUnavailableException("Central unavailable"));

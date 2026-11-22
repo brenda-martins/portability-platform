@@ -2,7 +2,8 @@
 
 > **Dono:** decisões de implementação e teste desta funcionalidade. Requisitos em [`prd.md`](prd.md);
 > fluxo em [`../../hld.md`](../../hld.md), convenções de ports/mapeamento em
-> [`../../lld.md`](../../lld.md), contratos HTTP em [`../../README.md`](../../README.md).
+> [`../../lld.md`](../../lld.md), contratos HTTP e idioma das mensagens em
+> [`../../README.md`](../../README.md), seção "Documentação da API".
 
 ## Escopo
 
@@ -69,10 +70,10 @@ mesmo padrão do registro (F03):
 
 - `ReceivingAccountRequest.validate()` usa as invariantes de `Validation` no domínio; não há Bean
   Validation duplicada. O controller chama `validate()` antes do caso de uso.
-- `UpdateReceivingAccountService` valida os campos e o id, busca a operação e devolve `Optional.empty()`
-  quando não existe. Se o status não for `CONFIRMED`, `withReceivingAccount` lança
-  `OperationNotConfirmedException`. Se a conta for igual à atual, devolve a operação sem chamar a Central,
-  sem gravar e sem anexar evento.
+- `UpdateReceivingAccountService` recebe o `OperationId` validado no construtor do value object e a conta
+  validada na borda e no domínio, busca a operação e devolve `Optional.empty()` quando não existe. Se o
+  status não for `CONFIRMED`, `withReceivingAccount` lança `OperationNotConfirmedException`. Se a conta for
+  igual à atual, devolve a operação sem chamar a Central, sem gravar e sem anexar evento.
 - Quando há mudança, a aplicação chama a Central **antes** de persistir, seguindo a regra usada no
   registro: falha de integração não altera o estado local nem a trilha. Depois do aceite da Central,
   persiste com `save(operation)` e anexa um `AuditEvent` com tipo `CONTA_ATUALIZADA` e mensagem com o

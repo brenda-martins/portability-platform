@@ -50,7 +50,7 @@ class MockCentralPortabilityTest {
     }
 
     @Test
-    void mustRespond401WhenSignatureIsMissing() throws Exception {
+    void shouldRespond401WhenSignatureIsMissing() throws Exception {
         String canonical = canonical("BEN-123", "INS-1", "Nova Credora S.A.");
 
         mockMvc.perform(request(signed(canonical), null))
@@ -58,7 +58,7 @@ class MockCentralPortabilityTest {
     }
 
     @Test
-    void mustRespond401WhenSignatureIsInvalid() throws Exception {
+    void shouldRespond401WhenSignatureIsInvalid() throws Exception {
         String canonical = canonical("BEN-123", "INS-1", "Nova Credora S.A.");
 
         mockMvc.perform(request(signed(canonical), "assinatura-invalida"))
@@ -66,7 +66,7 @@ class MockCentralPortabilityTest {
     }
 
     @Test
-    void mustRespond400WhenPayloadIsInvalid() throws Exception {
+    void shouldRespond400WhenPayloadIsInvalid() throws Exception {
         String canonical = canonical(" ", "INS-1", "Nova Credora S.A.");
 
         mockMvc.perform(request(signed(canonical), signer.sign(canonical)))

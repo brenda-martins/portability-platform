@@ -2,7 +2,8 @@
 
 > **Dono:** decisões de implementação e teste desta funcionalidade. Requisitos em [`prd.md`](prd.md);
 > fluxo em [`../../hld.md`](../../hld.md), convenções de ports/mapeamento em
-> [`../../lld.md`](../../lld.md), contratos HTTP em [`../../README.md`](../../README.md).
+> [`../../lld.md`](../../lld.md), contratos HTTP e idioma das mensagens em
+> [`../../README.md`](../../README.md), seção "Documentação da API".
 
 ## Escopo
 
@@ -73,7 +74,8 @@ gera; essa simulação pertence à F07.
   `Retry-After` do cabeçalho, traduz `CONFIRMADA`/`REJEITADA` para o enum interno e converte status
   diferente de `200`/`204`, corpo inválido, status desconhecido ou cabeçalho inválido em
   `CentralUnavailableException`. A aplicação traduz a exceção em `502`, pela regra já existente.
-- `GetOperationStatusService` valida o id, busca a operação pelo id e devolve vazio quando não existe.
+- `GetOperationStatusService` recebe o `OperationId` validado no construtor do value object, busca a
+  operação pelo id e devolve vazio quando não existe.
   Operação já finalizada não consulta a Central. Para operação pendente, executa o loop de até três
   consultas, usando `BackoffPort` entre tentativas. Ao receber status final, chama
   `transitionTo`, persiste com `save(operation)` e anexa um `AuditEvent` com tipo igual ao status final e
@@ -98,8 +100,8 @@ gera; essa simulação pertence à F07.
   registradas pelo fake), operação final sem chamada à Central, rejeição com motivo e evento, esgotamento
   das tentativas mantendo `PENDING`, falha da Central sem gravação de transição, interrupção do backoff,
   evento terminal não duplicado, conflito de versão com rollback, id inexistente devolvendo vazio e id em
-  branco rejeitado antes de qualquer port. `OperationConfirmationConcurrencyTest` cobre a corrida de
-  confirmação com H2, e `OperationTransactionalTest`, a atomicidade da transição com o evento.
+  branco rejeitado no construtor do value object. `OperationConfirmationConcurrencyTest` cobre a corrida
+  de confirmação com H2, e `OperationTransactionalTest`, a atomicidade da transição com o evento.
 - `CentralClientTest`: `204` + `Retry-After` viram `PENDING` com a duração correta, `200` traduz
   `CONFIRMADA` e `REJEITADA`, `500`/status desconhecido/cabeçalho inválido viram
   `CentralUnavailableException`, e o `GET` não envia assinatura.

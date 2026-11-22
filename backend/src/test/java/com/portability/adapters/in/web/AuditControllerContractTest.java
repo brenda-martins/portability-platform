@@ -59,7 +59,7 @@ class AuditControllerContractTest {
     }
 
     @Test
-    void mustRespond404WhenOperationDoesNotExist() throws Exception {
+    void shouldRespond404WhenOperationDoesNotExist() throws Exception {
         when(getOperationAuditUseCase.getAuditTrail(new OperationId("missing"))).thenReturn(Optional.empty());
 
         mockMvc.perform(get("/api/portability/{operationId}/audit", "missing"))

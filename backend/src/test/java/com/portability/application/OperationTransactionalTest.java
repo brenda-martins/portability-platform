@@ -73,7 +73,7 @@ class OperationTransactionalTest {
     }
 
     @Test
-    void mustRollbackOperationWhenAuditAppendFails() {
+    void shouldRollbackOperationWhenAuditAppendFails() {
         when(authorizationRepository.existsByBeneficiaryId(new BeneficiaryId(BENEFICIARY_ID))).thenReturn(true);
         when(((DiscountAgendaPort) centralPortabilityPort).fetchAgenda(new BeneficiaryId(BENEFICIARY_ID)))
                 .thenReturn(List.of(new DiscountInstallment(INSTALLMENT_ID, new AgreementId(AGREEMENT_ID),
@@ -90,7 +90,7 @@ class OperationTransactionalTest {
     }
 
     @Test
-    void mustRejectStaleUpdateWithOptimisticLock() {
+    void shouldRejectStaleUpdateWithOptimisticLock() {
         PortabilityOperation saved = operationRepository.save(pendingOperation(), KEY);
         PortabilityOperation current = saved.transitionTo(OperationStatus.CONFIRMED, null);
         PortabilityOperation stale = saved.transitionTo(OperationStatus.REJECTED, "Agreement blocked");

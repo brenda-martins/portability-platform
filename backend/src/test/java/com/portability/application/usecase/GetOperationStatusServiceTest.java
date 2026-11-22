@@ -62,7 +62,7 @@ class GetOperationStatusServiceTest {
     }
 
     @Test
-    void mustPollWithBackoffAndPersistConfirmationWithAuditEvent() {
+    void shouldPollWithBackoffAndPersistConfirmationWithAuditEvent() {
         operations.seed(pending(), "key");
         central.statuses.add(pendingStatus(Duration.ofSeconds(1)));
         central.statuses.add(pendingStatus(Duration.ofSeconds(1)));
@@ -81,7 +81,7 @@ class GetOperationStatusServiceTest {
     }
 
     @Test
-    void mustNotConsultCentralWhenOperationIsAlreadyFinal() {
+    void shouldNotConsultCentralWhenOperationIsAlreadyFinal() {
         operations.seed(terminal(OperationStatus.CONFIRMED), "key");
 
         PortabilityOperation result = service.getOperationStatus(OPERATION_ID).orElseThrow();
@@ -92,7 +92,7 @@ class GetOperationStatusServiceTest {
     }
 
     @Test
-    void mustPersistRejectionReasonAndEventWithProtocol() {
+    void shouldPersistRejectionReasonAndEventWithProtocol() {
         operations.seed(pending(), "key");
         central.statuses.add(new CentralOperationStatus(OperationStatus.REJECTED,
                 "Convênio bloqueado", Duration.ZERO));
@@ -109,7 +109,7 @@ class GetOperationStatusServiceTest {
     }
 
     @Test
-    void mustKeepOperationPendingAfterExhaustingAttempts() {
+    void shouldKeepOperationPendingAfterExhaustingAttempts() {
         operations.seed(pending(), "key");
         central.statuses.add(pendingStatus(Duration.ofSeconds(3)));
         central.statuses.add(pendingStatus(Duration.ofSeconds(3)));
@@ -124,7 +124,7 @@ class GetOperationStatusServiceTest {
     }
 
     @Test
-    void mustRecordFailureEventWithoutChangingOperationWhenCentralFails() {
+    void shouldRecordFailureEventWithoutChangingOperationWhenCentralFails() {
         operations.seed(pending(), "key");
         central.statusFailure = TestDoubles.centralFailure("Central unavailable");
 
@@ -138,7 +138,7 @@ class GetOperationStatusServiceTest {
     }
 
     @Test
-    void mustPreserveInterruptionWhenBackoffIsInterrupted() {
+    void shouldPreserveInterruptionWhenBackoffIsInterrupted() {
         operations.seed(pending(), "key");
         central.statuses.add(pendingStatus(Duration.ofSeconds(1)));
         backoff.interrupt = true;
@@ -151,7 +151,7 @@ class GetOperationStatusServiceTest {
     }
 
     @Test
-    void mustNotAppendTerminalEventTwiceWhenItIsAlreadyRecorded() {
+    void shouldNotAppendTerminalEventTwiceWhenItIsAlreadyRecorded() {
         operations.seed(pending(), "key");
         auditEvents.append(new AuditEvent("EVT-OLD", OPERATION_ID, AuditEventType.CONFIRMED,
                 "Evento anterior", Instant.parse(NOW)));
@@ -163,7 +163,7 @@ class GetOperationStatusServiceTest {
     }
 
     @Test
-    void mustRollBackTransitionWhenSaveReportsConcurrency() {
+    void shouldRollBackTransitionWhenSaveReportsConcurrency() {
         operations.seed(pending(), "key");
         central.statuses.add(new CentralOperationStatus(OperationStatus.CONFIRMED, null, Duration.ZERO));
         operations.failOnSave = true;
@@ -175,13 +175,13 @@ class GetOperationStatusServiceTest {
     }
 
     @Test
-    void mustReturnEmptyWhenOperationDoesNotExist() {
+    void shouldReturnEmptyWhenOperationDoesNotExist() {
         assertTrue(service.getOperationStatus(new OperationId("missing")).isEmpty());
         assertTrue(state.auditEvents.isEmpty());
     }
 
     @Test
-    void mustRejectBlankOperationIdBeforeConsultingPorts() {
+    void shouldRejectBlankOperationIdBeforeConsultingPorts() {
         assertThrows(InvalidRequestException.class, () -> new OperationId(" "));
         assertTrue(state.auditEvents.isEmpty());
     }

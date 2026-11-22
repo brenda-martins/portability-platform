@@ -63,7 +63,7 @@ class StartPortabilityServiceTest {
     }
 
     @Test
-    void mustCreatePendingOperationAndRequestEventWhenSelectionIsEligible() {
+    void shouldCreatePendingOperationAndRequestEventWhenSelectionIsEligible() {
         authorize();
         agenda.installments = List.of(openInstallment("INS-1", "2099-01-10"));
 
@@ -82,7 +82,7 @@ class StartPortabilityServiceTest {
     }
 
     @Test
-    void mustReturnExistingOperationWithoutCallingCentralWhenResent() {
+    void shouldReturnExistingOperationWithoutCallingCentralWhenResent() {
         PortabilityOperation existing = pendingOperation(new OperationId("OPE-OLD"));
         operations.seed(existing, PortabilityOperation.idempotencyKey(command(List.of("INS-1"))));
 
@@ -95,7 +95,7 @@ class StartPortabilityServiceTest {
     }
 
     @Test
-    void mustReserveIdempotencyKeyBeforeCallingCentral() {
+    void shouldReserveIdempotencyKeyBeforeCallingCentral() {
         authorize();
         agenda.installments = List.of(openInstallment("INS-1", "2099-01-10"));
 
@@ -105,7 +105,7 @@ class StartPortabilityServiceTest {
     }
 
     @Test
-    void mustReturnExistingOperationWithoutCallingCentralWhenReservationConflicts() {
+    void shouldReturnExistingOperationWithoutCallingCentralWhenReservationConflicts() {
         PortabilityOperation existing = pendingOperation(new OperationId("OPE-OLD"));
         operations.seed(existing, PortabilityOperation.idempotencyKey(command(List.of("INS-1"))));
         operations.hideExistingOnFirstLookup = true;
@@ -120,7 +120,7 @@ class StartPortabilityServiceTest {
     }
 
     @Test
-    void mustUseSameIdempotencyKeyRegardlessOfInstallmentOrder() {
+    void shouldUseSameIdempotencyKeyRegardlessOfInstallmentOrder() {
         authorize();
         agenda.installments = List.of(openInstallment("INS-1", "2099-01-10"),
                 openInstallment("INS-2", "2099-01-10"));
@@ -133,7 +133,7 @@ class StartPortabilityServiceTest {
     }
 
     @Test
-    void mustRejectOperationWhenBeneficiaryHasNoOptIn() {
+    void shouldRejectOperationWhenBeneficiaryHasNoOptIn() {
         assertThrows(BeneficiaryNotAuthorizedException.class,
                 () -> service.startPortability(command(List.of("INS-1"))));
 
@@ -142,7 +142,7 @@ class StartPortabilityServiceTest {
     }
 
     @Test
-    void mustRejectInstallmentThatIsNotInAgenda() {
+    void shouldRejectInstallmentThatIsNotInAgenda() {
         authorize();
         agenda.installments = List.of(openInstallment("INS-1", "2099-01-10"));
 
@@ -152,7 +152,7 @@ class StartPortabilityServiceTest {
     }
 
     @Test
-    void mustRejectInstallmentThatWasAlreadyPorted() {
+    void shouldRejectInstallmentThatWasAlreadyPorted() {
         authorize();
         agenda.installments = List.of(new DiscountInstallment("INS-1", AGREEMENT, new BigDecimal("120.50"),
                 LocalDate.parse("2099-01-10"), InstallmentStatus.PORTED));
@@ -164,7 +164,7 @@ class StartPortabilityServiceTest {
     }
 
     @Test
-    void mustRejectInstallmentWithPastDiscountDate() {
+    void shouldRejectInstallmentWithPastDiscountDate() {
         authorize();
         agenda.installments = List.of(openInstallment("INS-1", "2020-01-10"));
 
@@ -174,7 +174,7 @@ class StartPortabilityServiceTest {
     }
 
     @Test
-    void mustRejectDuplicatedInstallmentIdsBeforeCallingPorts() {
+    void shouldRejectDuplicatedInstallmentIdsBeforeCallingPorts() {
         InvalidRequestException error = assertThrows(InvalidRequestException.class,
                 () -> service.startPortability(command(List.of("INS-1", "INS-1"))));
 
@@ -184,21 +184,21 @@ class StartPortabilityServiceTest {
     }
 
     @Test
-    void mustRejectEmptySelectionBeforeCallingPorts() {
+    void shouldRejectEmptySelectionBeforeCallingPorts() {
         assertThrows(InvalidRequestException.class,
                 () -> service.startPortability(command(List.of())));
         assertTrue(state.operations.isEmpty());
     }
 
     @Test
-    void mustRejectBlankCreditorBeforeCallingCentral() {
+    void shouldRejectBlankCreditorBeforeCallingCentral() {
         assertThrows(InvalidRequestException.class,
                 () -> service.startPortability(command(List.of("INS-1"), " ", account())));
         assertTrue(state.operations.isEmpty());
     }
 
     @Test
-    void mustRejectIncompleteReceivingAccountBeforeCallingCentral() {
+    void shouldRejectIncompleteReceivingAccountBeforeCallingCentral() {
         InvalidRequestException error = assertThrows(InvalidRequestException.class,
                 () -> service.startPortability(command(List.of("INS-1"), CREDITOR,
                         new ReceivingAccount("001", " ", "56789-0"))));
@@ -208,7 +208,7 @@ class StartPortabilityServiceTest {
     }
 
     @Test
-    void mustNotPersistOperationOrEventWhenCentralFails() {
+    void shouldNotPersistOperationOrEventWhenCentralFails() {
         authorize();
         agenda.installments = List.of(openInstallment("INS-1", "2099-01-10"));
         central.registrationFailure = TestDoubles.centralFailure("Central unavailable");
@@ -221,7 +221,7 @@ class StartPortabilityServiceTest {
     }
 
     @Test
-    void mustRollbackOperationAndEventWhenSaveReportsConcurrency() {
+    void shouldRollbackOperationAndEventWhenSaveReportsConcurrency() {
         authorize();
         agenda.installments = List.of(openInstallment("INS-1", "2099-01-10"));
         operations.failOnSave = true;

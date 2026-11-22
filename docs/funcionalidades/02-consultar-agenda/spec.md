@@ -2,7 +2,8 @@
 
 > **Dono:** decisões de implementação e teste desta funcionalidade. Requisitos em [`prd.md`](prd.md);
 > fluxo em [`../../hld.md`](../../hld.md), convenções de ports/mapeamento em
-> [`../../lld.md`](../../lld.md), contratos HTTP em [`../../README.md`](../../README.md).
+> [`../../lld.md`](../../lld.md), contratos HTTP e idioma das mensagens em
+> [`../../README.md`](../../README.md), seção "Documentação da API".
 
 ## Escopo
 
@@ -69,7 +70,7 @@ conforme [`../../lld.md`](../../lld.md).
 
 ## Decisões de implementação
 
-- `GetDiscountAgendaService` valida o `beneficiaryId`, consulta
+- `GetDiscountAgendaService` recebe o `BeneficiaryId` validado no construtor do value object, consulta
   `AuthorizationRepository.existsByBeneficiaryId` e lança `BeneficiaryNotAuthorizedException` quando não
   há autorização. Com autorização, chama `DiscountAgendaPort.fetchAgenda` e devolve a lista completa, sem
   filtrar por data ou status; a elegibilidade de seleção permanece no registro (F03).
@@ -92,7 +93,8 @@ conforme [`../../lld.md`](../../lld.md).
 ## Decisões de teste
 
 - `GetDiscountAgendaServiceTest` (unitário, fakes dos ports): agenda com autorização, sem autorização sem
-  chamar a Central, `beneficiaryId` em branco e falha da Central sem devolver lista parcial.
+  chamar a Central, `beneficiaryId` em branco rejeitado no construtor do value object e falha da Central
+  sem devolver lista parcial.
 - `CentralClientTest` (HTTP em processo): tradução da resposta da Central, falha HTTP e resposta com
   status desconhecido.
 - `AgendaControllerContractTest` (`MockMvc`, caso de uso mockado): `200`, `403`, `400` e `502`, sempre

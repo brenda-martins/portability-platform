@@ -51,7 +51,7 @@ class AgendaControllerContractTest {
     }
 
     @Test
-    void mustRespond403WhenBeneficiaryIsNotAuthorized() throws Exception {
+    void shouldRespond403WhenBeneficiaryIsNotAuthorized() throws Exception {
         when(getDiscountAgendaUseCase.getAgenda(new BeneficiaryId("BEN-999")))
                 .thenThrow(new BeneficiaryNotAuthorizedException("Beneficiary not authorized"));
 
@@ -69,7 +69,7 @@ class AgendaControllerContractTest {
     }
 
     @Test
-    void mustRespond502WhenCentralFails() throws Exception {
+    void shouldRespond502WhenCentralFails() throws Exception {
         when(getDiscountAgendaUseCase.getAgenda(new BeneficiaryId("BEN-123")))
                 .thenThrow(new CentralUnavailableException("Central unavailable"));
 

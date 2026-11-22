@@ -72,7 +72,7 @@ class OperationConfirmationConcurrencyTest {
     }
 
     @Test
-    void mustNotAppendTerminalEventTwiceWhenItIsAlreadyRecorded() {
+    void shouldNotAppendTerminalEventTwiceWhenItIsAlreadyRecorded() {
         operationRepository.save(pendingOperation(), KEY);
         auditEventRepository.append(new AuditEvent(
                 "EVT-CC-1", new OperationId(OPERATION_ID), "CONFIRMADA", "Evento anterior", Instant.now()));
@@ -86,7 +86,7 @@ class OperationConfirmationConcurrencyTest {
     }
 
     @Test
-    void mustAppendOnlyOneTerminalEventWhenTwoConsultationsRace() throws Exception {
+    void shouldAppendOnlyOneTerminalEventWhenTwoConsultationsRace() throws Exception {
         operationRepository.save(pendingOperation(), KEY);
         when(centralPortabilityPort.consultStatus(new Protocol(PROTOCOL)))
                 .thenReturn(new CentralOperationStatus(OperationStatus.CONFIRMED, null, null));

@@ -87,7 +87,7 @@ class AuthorizationControllerContractTest {
     }
 
     @Test
-    void mustRespond409WhenBeneficiaryAndAgreementPairIsDuplicated() throws Exception {
+    void shouldRespond409WhenBeneficiaryAndAgreementPairIsDuplicated() throws Exception {
         when(registerAuthorizationUseCase.registerAuthorization(
                         new BeneficiaryId("BEN-123"), new AgreementId("AGR-001")))
                 .thenThrow(new DataIntegrityViolationException("duplicate pair"));
@@ -100,7 +100,7 @@ class AuthorizationControllerContractTest {
     }
 
     @Test
-    void mustRespond502WhenCentralFails() throws Exception {
+    void shouldRespond502WhenCentralFails() throws Exception {
         when(registerAuthorizationUseCase.registerAuthorization(
                         new BeneficiaryId("BEN-123"), new AgreementId("AGR-001")))
                 .thenThrow(new CentralUnavailableException("Central unavailable"));

@@ -2,7 +2,8 @@
 
 > **Dono:** decisões de implementação e teste desta funcionalidade. Requisitos em [`prd.md`](prd.md);
 > fluxo em [`../../hld.md`](../../hld.md), convenções de ports/mapeamento em
-> [`../../lld.md`](../../lld.md), contratos HTTP em [`../../README.md`](../../README.md).
+> [`../../lld.md`](../../lld.md), contratos HTTP e idioma das mensagens em
+> [`../../README.md`](../../README.md), seção "Documentação da API".
 
 ## Escopo
 
@@ -78,8 +79,9 @@ ordem e verifica o HMAC. O mesmo codec é usado pelo opt-in (F01) e pela atualiz
 ## Decisões de implementação
 
 - `PortabilityRequest` e `ReceivingAccountRequest` são DTOs da borda cujo `validate()` chama as
-  invariantes de `Validation` no domínio; não há Bean Validation duplicada. O controller chama
-  `validate()` antes do caso de uso. `ApiExceptionHandler` devolve `400` com `fields` para
+  invariantes de `Validation` no domínio; não há Bean Validation duplicada. `BeneficiaryId`,
+  `StartPortabilityCommand` e os demais records aplicam as mesmas invariantes no construtor. O controller
+  chama `validate()` antes do caso de uso. `ApiExceptionHandler` devolve `400` com `fields` para
   `InvalidRequestException` e `409` para outras violações de unicidade; conflito de reserva da chave é
   resolvido no caso de uso como reenvio.
 - `StartPortabilityService` recebe o command validado, calcula a chave SHA-256 em hex de

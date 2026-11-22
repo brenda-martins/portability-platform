@@ -76,7 +76,7 @@ class StartPortabilityIdempotencyConcurrencyTest {
     }
 
     @Test
-    void mustRegisterOnlyOneOperationWhenIdenticalRequestsRace() throws Exception {
+    void shouldRegisterOnlyOneOperationWhenIdenticalRequestsRace() throws Exception {
         authorizationRepository.save(new Authorization("AUT-CC-1", new BeneficiaryId("BEN-123"),
                 new AgreementId("AGR-001"), Instant.parse("2026-11-22T12:34:56Z")));
         when(((DiscountAgendaPort) centralClient).fetchAgenda(new BeneficiaryId("BEN-123")))

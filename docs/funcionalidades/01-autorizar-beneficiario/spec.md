@@ -2,7 +2,8 @@
 
 > **Dono:** decisões de implementação e teste desta funcionalidade. Requisitos em [`prd.md`](prd.md);
 > fluxo em [`../../hld.md`](../../hld.md), convenções de ports/mapeamento em
-> [`../../lld.md`](../../lld.md), contratos HTTP em [`../../README.md`](../../README.md).
+> [`../../lld.md`](../../lld.md), contratos HTTP e idioma das mensagens em
+> [`../../README.md`](../../README.md), seção "Documentação da API".
 
 ## Escopo
 
@@ -44,11 +45,12 @@ devolve a autorização e o indicador `created`, para que a borda HTTP escolha e
 
 ## Decisões de implementação
 
-- `Authorization` rejeita `beneficiaryId` e `agreementId` em branco no construtor, por meio de
-  `Validation`. O DTO `AuthorizeRequest` chama `validate()` na borda; a invariant tem um único dono no
-  domínio.
-- `RegisterAuthorizationService` valida os campos, executa a consulta/gravação em uma unidade de trabalho
-  (`TransactionPort`), consulta `AuthorizationRepository.findByBeneficiaryAndAgreement` e devolve a
+- `BeneficiaryId` e `AgreementId` rejeitam valores em branco no construtor, por meio de `Validation`;
+  `Authorization` recebe os value objects. O DTO `AuthorizeRequest` chama `validate()` na borda; a
+  invariant tem um único dono no domínio.
+- `RegisterAuthorizationService` recebe os value objects validados, executa a consulta/gravação em uma
+  unidade de trabalho (`TransactionPort`), consulta `AuthorizationRepository.findByBeneficiaryAndAgreement`
+  e devolve a
   autorização existente com `created = false`. Caso contrário, chama `CentralAuthorizationPort`, cria a
   `Authorization` com o id devolvido e `createdAt = Instant.now(clock)`, salva no repositório e devolve
   `created = true`. `Clock`, `TransactionPort` e `MetricsPort` são injetados. Falha da Central não gera
@@ -71,7 +73,7 @@ devolve a autorização e o indicador `created`, para que a borda HTTP escolha e
 ## Decisões de teste
 
 - `RegisterAuthorizationServiceTest` (unitário, fakes dos ports): cria autorização, reenvio idempotente,
-  campos inválidos e falha da Central sem persistência.
+  id em branco rejeitado no construtor do value object e falha da Central sem persistência.
 - `HmacSignatureServiceTest` (unitário): assinatura válida, verificação válida e rejeição de assinatura
   divergente.
 - `CentralClientTest` (HTTP em processo): payload e `X-Signature` enviados e tradução de resposta de erro

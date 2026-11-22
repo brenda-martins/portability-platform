@@ -40,7 +40,7 @@ class GetOperationAuditServiceTest {
     }
 
     @Test
-    void mustReturnAuditEventsWhenOperationExists() {
+    void shouldReturnAuditEventsWhenOperationExists() {
         operations.seed(operation(), "key");
         Instant occurredAt = Instant.parse("2026-11-22T12:34:56Z");
         auditEvents.append(new AuditEvent("EVT-1", OPERATION_ID, AuditEventType.REQUESTED,
@@ -57,14 +57,14 @@ class GetOperationAuditServiceTest {
     }
 
     @Test
-    void mustReturnEmptyWhenOperationDoesNotExist() {
+    void shouldReturnEmptyWhenOperationDoesNotExist() {
         assertTrue(service.getAuditTrail(new OperationId("missing")).isEmpty());
         assertTrue(state.auditEvents.isEmpty());
         assertTrue(metrics.names.isEmpty());
     }
 
     @Test
-    void mustRejectBlankOperationIdBeforeConsultingPorts() {
+    void shouldRejectBlankOperationIdBeforeConsultingPorts() {
         assertThrows(InvalidRequestException.class, () -> new OperationId(" "));
         assertTrue(state.auditEvents.isEmpty());
     }
