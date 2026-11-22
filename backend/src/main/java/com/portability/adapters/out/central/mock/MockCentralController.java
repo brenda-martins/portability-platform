@@ -1,10 +1,10 @@
 package com.portability.adapters.out.central.mock;
 
-import tools.jackson.core.JacksonException;
-import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.ObjectMapper;
-import tools.jackson.databind.node.ObjectNode;
-import com.portability.domain.ports.out.SignaturePort;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import com.portability.adapters.out.central.CentralRequestCodec;
+import com.portability.adapters.out.central.HmacSignatureService;
+import com.portability.domain.model.ReceivingAccount;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -16,39 +16,45 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 import java.math.BigDecimal;
-import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
-/**
- * Local simulation of the Central de Convênios, following the contract suggested in the PDF.
- */
+/** Local simulation of the Central de Convênios, following the contract suggested in the PDF. */
 @RestController
 @RequestMapping("/central")
 public class MockCentralController {
 
-    private final SignaturePort signaturePort;
+    private final CentralRequestCodec codec;
     private final ObjectMapper objectMapper;
     private final Set<String> registeredProtocols = ConcurrentHashMap.newKeySet();
     private final Map<String, AtomicInteger> statusConsultations = new ConcurrentHashMap<>();
     private final Map<String, Map<String, String>> updatedAccounts = new ConcurrentHashMap<>();
-    private final Map<String, StatusOutcome> statusOutcomes = new ConcurrentHashMap<>();
+    private final Map<String, CreditorMarker> creditorMarkers = new ConcurrentHashMap<>();
 
-    private enum StatusOutcome {
-        CONFIRMADA, REJEITADA, FALHA
+    private enum CreditorMarker {
+        CONFIRM, REJECT, FAIL
     }
 
-    public MockCentralController(SignaturePort signaturePort, ObjectMapper objectMapper) {
-        this.signaturePort = signaturePort;
+    @Autowired
+    public MockCentralController(CentralRequestCodec codec, ObjectMapper objectMapper) {
+        this.codec = codec;
         this.objectMapper = objectMapper;
+    }
+
+    public MockCentralController(HmacSignatureService signatureService, ObjectMapper objectMapper) {
+        this(new CentralRequestCodec(signatureService, objectMapper), objectMapper);
     }
 
     @PostMapping("/autorizacoes")
@@ -56,22 +62,15 @@ public class MockCentralController {
             @RequestBody String body,
             @RequestHeader(value = "X-Signature", required = false) String signature
     ) {
-        if (signature == null || !signaturePort.verify(body, signature)) {
+        if (!codec.isValidSignature(body, signature)) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
-
-        JsonNode payload;
-        try {
-            payload = objectMapper.readTree(body);
-        } catch (JacksonException exception) {
-            return ResponseEntity.badRequest().build();
-        }
+        JsonNode payload = parse(body);
         if (payload == null || !payload.isObject()
                 || isBlank(payload.path("beneficiarioId").asText(""))
                 || isBlank(payload.path("convenioId").asText(""))) {
             return ResponseEntity.badRequest().build();
         }
-
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(Map.of("autorizacaoId", "AUT-" + UUID.randomUUID()));
     }
@@ -106,43 +105,34 @@ public class MockCentralController {
             @RequestBody String body,
             @RequestHeader(value = "X-Signature", required = false) String signature
     ) {
-        JsonNode payload;
-        String canonicalBody;
-        try {
-            payload = objectMapper.readTree(body);
-            if (payload == null || !payload.isObject()) {
-                return ResponseEntity.badRequest().build();
-            }
-            ObjectNode canonical = (ObjectNode) payload.deepCopy();
-            canonical.remove("assinatura");
-            canonicalBody = objectMapper.writeValueAsString(canonical);
-        } catch (JacksonException exception) {
+        JsonNode payload = parse(body);
+        if (payload == null || !payload.isObject()) {
             return ResponseEntity.badRequest().build();
         }
-
-        if (signature == null || !signaturePort.verify(canonicalBody, signature)) {
+        if (!codec.isValidSignature(body, signature)) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
         if (!isValidPortabilityPayload(payload)) {
             return ResponseEntity.badRequest().build();
         }
 
-        String protocol = "PRT-" + UUID.nameUUIDFromBytes(canonicalBody.getBytes(StandardCharsets.UTF_8))
+        String canonicalBody = codec.canonicalBody(body).orElseThrow();
+        String protocol = "PRT-" + UUID.nameUUIDFromBytes(canonicalBody.getBytes(java.nio.charset.StandardCharsets.UTF_8))
                 .toString().replace("-", "");
         registeredProtocols.add(protocol);
-        statusOutcomes.put(protocol, outcomeFor(payload.path("credorCessionario").asText("")));
+        creditorMarkers.put(protocol, markerFor(payload.path("credorCessionario").asText("")));
         return ResponseEntity.status(HttpStatus.ACCEPTED).body(Map.of("protocolo", protocol));
     }
 
-    private static StatusOutcome outcomeFor(String creditorAssignee) {
+    private static CreditorMarker markerFor(String creditorAssignee) {
         String value = creditorAssignee == null ? "" : creditorAssignee.toUpperCase(Locale.ROOT);
         if (value.contains("REJEITAR")) {
-            return StatusOutcome.REJEITADA;
+            return CreditorMarker.REJECT;
         }
         if (value.contains("FALHA")) {
-            return StatusOutcome.FALHA;
+            return CreditorMarker.FAIL;
         }
-        return StatusOutcome.CONFIRMADA;
+        return CreditorMarker.CONFIRM;
     }
 
     private static boolean isValidPortabilityPayload(JsonNode payload) {
@@ -172,8 +162,8 @@ public class MockCentralController {
         if (isBlank(protocol) || !registeredProtocols.contains(protocol)) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
         }
-        StatusOutcome outcome = statusOutcomes.getOrDefault(protocol, StatusOutcome.CONFIRMADA);
-        if (outcome == StatusOutcome.FALHA) {
+        CreditorMarker marker = creditorMarkers.getOrDefault(protocol, CreditorMarker.CONFIRM);
+        if (marker == CreditorMarker.FAIL) {
             return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).build();
         }
         int consultations = statusConsultations.computeIfAbsent(protocol, key -> new AtomicInteger())
@@ -182,8 +172,8 @@ public class MockCentralController {
             return ResponseEntity.noContent().header(HttpHeaders.RETRY_AFTER, "1").build();
         }
         Map<String, Object> body = new LinkedHashMap<>();
-        body.put("status", outcome == StatusOutcome.REJEITADA ? "REJEITADA" : "CONFIRMADA");
-        body.put("motivoRejeicao", outcome == StatusOutcome.REJEITADA
+        body.put("status", marker == CreditorMarker.REJECT ? "REJEITADA" : "CONFIRMADA");
+        body.put("motivoRejeicao", marker == CreditorMarker.REJECT
                 ? "Convênio de origem não autoriza a portabilidade" : null);
         return ResponseEntity.ok(body);
     }
@@ -194,21 +184,11 @@ public class MockCentralController {
             @RequestBody String body,
             @RequestHeader(value = "X-Signature", required = false) String signature
     ) {
-        JsonNode payload;
-        String canonicalBody;
-        try {
-            payload = objectMapper.readTree(body);
-            if (payload == null || !payload.isObject()) {
-                return ResponseEntity.badRequest().build();
-            }
-            ObjectNode canonical = (ObjectNode) payload.deepCopy();
-            canonical.remove("assinatura");
-            canonicalBody = objectMapper.writeValueAsString(canonical);
-        } catch (JacksonException exception) {
+        JsonNode payload = parse(body);
+        if (payload == null || !payload.isObject()) {
             return ResponseEntity.badRequest().build();
         }
-
-        if (signature == null || !signaturePort.verify(canonicalBody, signature)) {
+        if (!codec.isValidSignature(body, signature)) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
         if (isBlank(protocol) || !registeredProtocols.contains(protocol)) {
@@ -226,11 +206,29 @@ public class MockCentralController {
         return ResponseEntity.ok(account);
     }
 
+    /** Package-private inspection point used by the mock's own test suite. */
+    Optional<ReceivingAccount> accountFor(String protocol) {
+        Map<String, String> account = updatedAccounts.get(protocol);
+        if (account == null) {
+            return Optional.empty();
+        }
+        return Optional.of(new ReceivingAccount(
+                account.get("banco"), account.get("agencia"), account.get("conta")));
+    }
+
     private static boolean isValidAccountUpdatePayload(JsonNode payload, String protocol) {
         return protocol.equals(payload.path("protocolo").asText(""))
                 && !isBlank(payload.path("banco").asText(""))
                 && !isBlank(payload.path("agencia").asText(""))
                 && !isBlank(payload.path("conta").asText(""));
+    }
+
+    private JsonNode parse(String body) {
+        try {
+            return objectMapper.readTree(body);
+        } catch (JacksonException exception) {
+            return null;
+        }
     }
 
     private static boolean isBlank(String value) {

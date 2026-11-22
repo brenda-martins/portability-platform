@@ -1,7 +1,6 @@
 package com.portability.domain.model;
 
-/** Raised when the receiving account of a non-confirmed operation is updated. */
-public class OperationNotConfirmedException extends RuntimeException {
+public class OperationNotConfirmedException extends DomainException {
 
     public OperationNotConfirmedException(String message) {
         super(message);

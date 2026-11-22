@@ -1,5 +1,6 @@
 package com.portability.adapters.out.persistence;
 
+import com.portability.adapters.out.persistence.entity.AuthorizationJpaEntity;
 import com.portability.domain.model.Authorization;
 import com.portability.domain.ports.out.AuthorizationRepository;
 import org.springframework.stereotype.Component;

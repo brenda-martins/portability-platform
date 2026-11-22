@@ -10,12 +10,7 @@ import java.time.Duration;
 public class ThreadBackoffAdapter implements BackoffPort {
 
     @Override
-    public void await(Duration duration) {
-        try {
-            Thread.sleep(duration);
-        } catch (InterruptedException exception) {
-            Thread.currentThread().interrupt();
-            throw new IllegalStateException("Interrupted while waiting for the Central status", exception);
-        }
+    public void await(Duration duration) throws InterruptedException {
+        Thread.sleep(duration);
     }
 }

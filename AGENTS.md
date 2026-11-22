@@ -178,6 +178,10 @@ A hierarquia é **funcionalidade → tarefa**, e cada funcionalidade tem dois do
   usuário o descongela. Uma decisão que se mostrar errada é corrigida na spec, no LLD ou numa tarefa
   nova. Fora da pasta da funcionalidade, a tarefa é `F<NN>-T<NN>`. Versionar o plano em Git só acontece
   se o usuário pedir expressamente, conforme "Convenções de Git".
+- **Melhoria do roadmap:** implemente a melhoria solicitada consultando as specs existentes e atualize
+  os documentos donos que forem afetados. Não crie PRD, spec, tarefa, plano ou nova funcionalidade só
+  para executar uma melhoria; crie esses artefatos apenas quando o usuário pedir planejamento ou quando
+  a solicitação iniciar uma nova funcionalidade. Resolva ambiguidades na conversa antes de implementar.
 
 Estrutura, numeração e status: `docs/roadmap.md` e `docs/funcionalidades/README.md`.
 O status da funcionalidade mora no roadmap; o da tarefa, no campo `Status` do `tarefa.md`.
@@ -250,9 +254,10 @@ Nenhuma implementação começa sem spec. O fluxo é **sequencial**; não pule e
 
 1. **Consultar** o PDF, os requisitos do usuário, `docs/`, este arquivo, os `AGENTS.md` de projeto e o
    README.
-2. **Localizar ou escrever a spec da tarefa:** PRD → spec → tarefa → plano, conforme "Planejamento".
-   Registre comportamento observável, critérios de aceite e contratos afetados.
-   Se algo estiver ambíguo, pergunte e registre a resposta.
+2. **Localizar a spec aplicável:** para uma melhoria do roadmap, use as specs existentes e não crie
+   artefatos de planejamento; para uma nova funcionalidade, siga PRD → spec → tarefa → plano, conforme
+   "Planejamento". Registre comportamento observável, critérios de aceite e contratos afetados na spec
+   existente quando necessário. Se algo estiver ambíguo, pergunte antes de implementar.
 3. **Desenhar contratos antes do código:** ports, assinaturas, DTOs, eventos e tabelas. Se houver
    mudança de contrato, atualize README e `docs/lld.md` nesta etapa.
 4. **Escrever testes de aceite (red):** pelo menos um teste por critério crítico; execute e confirme que

@@ -6,6 +6,7 @@ import com.portability.domain.ports.in.RegisterAuthorizationUseCase;
 import com.portability.domain.ports.out.CentralUnavailableException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -77,6 +78,18 @@ class AuthorizationControllerContractTest {
                 .andExpect(jsonPath("$.message").exists());
 
         verifyNoInteractions(registerAuthorizationUseCase);
+    }
+
+    @Test
+    void mustRespond409WhenBeneficiaryAndAgreementPairIsDuplicated() throws Exception {
+        when(registerAuthorizationUseCase.registerAuthorization("BEN-123", "AGR-001"))
+                .thenThrow(new DataIntegrityViolationException("duplicate pair"));
+
+        mockMvc.perform(post("/api/authorizations")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(VALID_BODY))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").exists());
     }
 
     @Test

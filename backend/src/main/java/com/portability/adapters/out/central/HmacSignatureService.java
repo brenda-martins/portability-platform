@@ -1,7 +1,7 @@
 package com.portability.adapters.out.central;
 
-import com.portability.domain.ports.out.SignaturePort;
-import org.springframework.beans.factory.annotation.Value;
+import com.portability.adapters.in.config.CentralProperties;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import javax.crypto.Mac;
@@ -12,17 +12,21 @@ import java.util.Base64;
 
 /** HMAC-SHA256 signature of messages exchanged with the Central. */
 @Component
-public class HmacSignatureService implements SignaturePort {
+public class HmacSignatureService {
 
     private static final String ALGORITHM = "HmacSHA256";
 
     private final String hmacSecret;
 
-    public HmacSignatureService(@Value("${central.hmac-secret}") String hmacSecret) {
+    @Autowired
+    public HmacSignatureService(CentralProperties properties) {
+        this(properties.hmacSecret());
+    }
+
+    public HmacSignatureService(String hmacSecret) {
         this.hmacSecret = hmacSecret;
     }
 
-    @Override
     public String sign(String payload) {
         try {
             Mac mac = Mac.getInstance(ALGORITHM);
@@ -33,7 +37,6 @@ public class HmacSignatureService implements SignaturePort {
         }
     }
 
-    @Override
     public boolean verify(String payload, String signature) {
         if (signature == null) {
             return false;

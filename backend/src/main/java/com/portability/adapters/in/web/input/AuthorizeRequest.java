@@ -1,9 +1,12 @@
 package com.portability.adapters.in.web.input;
 
-import jakarta.validation.constraints.NotBlank;
+import com.portability.domain.model.Validation;
 
-public record AuthorizeRequest(
-        @NotBlank String beneficiaryId,
-        @NotBlank String agreementId
-) {
+/** Edge DTO; field invariants are owned by the domain. */
+public record AuthorizeRequest(String beneficiaryId, String agreementId) {
+
+    public void validate() {
+        Validation.requireNotBlank(beneficiaryId, "beneficiaryId");
+        Validation.requireNotBlank(agreementId, "agreementId");
+    }
 }

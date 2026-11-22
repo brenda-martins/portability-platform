@@ -1,7 +1,6 @@
 package com.portability.adapters.out.central;
 
-import tools.jackson.core.JacksonException;
-import tools.jackson.databind.ObjectMapper;
+import com.portability.adapters.in.config.CentralProperties;
 import com.portability.domain.model.CentralOperationStatus;
 import com.portability.domain.model.DiscountInstallment;
 import com.portability.domain.model.InstallmentStatus;
@@ -11,8 +10,7 @@ import com.portability.domain.ports.out.CentralAuthorizationPort;
 import com.portability.domain.ports.out.CentralPortabilityPort;
 import com.portability.domain.ports.out.CentralUnavailableException;
 import com.portability.domain.ports.out.DiscountAgendaPort;
-import com.portability.domain.ports.out.SignaturePort;
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -21,6 +19,8 @@ import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 
 import java.math.BigDecimal;
 import java.net.http.HttpClient;
@@ -28,25 +28,25 @@ import java.time.Duration;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.util.Arrays;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 
-/**
- * Outbound HTTP adapter for the Central de Convênios.
- */
 @Component
 public class CentralClient implements DiscountAgendaPort, CentralPortabilityPort, CentralAuthorizationPort {
 
     private final RestClient restClient;
-    private final SignaturePort signaturePort;
+    private final CentralRequestCodec codec;
     private final ObjectMapper objectMapper;
 
-    public CentralClient(
-            @Value("${central.base-url}") String centralBaseUrl,
-            SignaturePort signaturePort,
-            ObjectMapper objectMapper
-    ) {
+    @Autowired
+    public CentralClient(CentralProperties properties, CentralRequestCodec codec, ObjectMapper objectMapper) {
+        this(properties.baseUrl(), codec, objectMapper);
+    }
+
+    public CentralClient(String centralBaseUrl, HmacSignatureService signatureService, ObjectMapper objectMapper) {
+        this(centralBaseUrl, new CentralRequestCodec(signatureService, objectMapper), objectMapper);
+    }
+
+    private CentralClient(String centralBaseUrl, CentralRequestCodec codec, ObjectMapper objectMapper) {
         HttpClient httpClient = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(2))
                 .build();
@@ -56,37 +56,25 @@ public class CentralClient implements DiscountAgendaPort, CentralPortabilityPort
                 .baseUrl(centralBaseUrl)
                 .requestFactory(requestFactory)
                 .build();
-        this.signaturePort = signaturePort;
+        this.codec = codec;
         this.objectMapper = objectMapper;
     }
 
     @Override
     public String registerAuthorization(String beneficiaryId, String agreementId) {
-        Map<String, String> request = new LinkedHashMap<>();
-        request.put("beneficiarioId", beneficiaryId);
-        request.put("convenioId", agreementId);
-
-        String body;
-        try {
-            body = objectMapper.writeValueAsString(request);
-        } catch (JacksonException exception) {
-            throw new CentralUnavailableException("Could not build Central request", exception);
-        }
-
+        CentralRequestCodec.SignedRequest request = codec.authorization(beneficiaryId, agreementId);
         try {
             ResponseEntity<CentralAuthorizationResponse> response = restClient.post()
                     .uri("/autorizacoes")
                     .contentType(MediaType.APPLICATION_JSON)
-                    .header("X-Signature", signaturePort.sign(body))
-                    .body(body)
+                    .header("X-Signature", request.signature())
+                    .body(request.body())
                     .retrieve()
                     .toEntity(CentralAuthorizationResponse.class);
 
             CentralAuthorizationResponse payload = response.getBody();
             if (response.getStatusCode() != HttpStatus.CREATED
-                    || payload == null
-                    || payload.autorizacaoId() == null
-                    || payload.autorizacaoId().isBlank()) {
+                    || payload == null || isBlank(payload.autorizacaoId())) {
                 throw new CentralUnavailableException("Unexpected response from Central");
             }
             return payload.autorizacaoId();
@@ -131,38 +119,17 @@ public class CentralClient implements DiscountAgendaPort, CentralPortabilityPort
         }
     }
 
-    private static boolean isBlank(String value) {
-        return value == null || value.isBlank();
-    }
-
     @Override
-    public String registerPortability(
-            String beneficiaryId,
-            List<String> installmentIds,
-            String creditorAssignee,
-            ReceivingAccount receivingAccount
-    ) {
-        Map<String, Object> payload = new LinkedHashMap<>();
-        payload.put("beneficiarioId", beneficiaryId);
-        payload.put("parcelas", installmentIds);
-        payload.put("credorCessionario", creditorAssignee);
-        Map<String, String> account = new LinkedHashMap<>();
-        account.put("banco", receivingAccount.bank());
-        account.put("agencia", receivingAccount.agency());
-        account.put("conta", receivingAccount.account());
-        payload.put("contaRecebimento", account);
-
+    public String registerPortability(String beneficiaryId, List<String> installmentIds,
+            String creditorAssignee, ReceivingAccount receivingAccount) {
+        CentralRequestCodec.SignedRequest request = codec.portability(
+                beneficiaryId, installmentIds, creditorAssignee, receivingAccount);
         try {
-            String canonicalBody = objectMapper.writeValueAsString(payload);
-            String signature = signaturePort.sign(canonicalBody);
-            payload.put("assinatura", signature);
-            String body = objectMapper.writeValueAsString(payload);
-
             ResponseEntity<CentralOperationResponse> response = restClient.post()
                     .uri("/operacoes-portabilidade")
                     .contentType(MediaType.APPLICATION_JSON)
-                    .header("X-Signature", signature)
-                    .body(body)
+                    .header("X-Signature", request.signature())
+                    .body(request.body())
                     .retrieve()
                     .toEntity(CentralOperationResponse.class);
 
@@ -191,7 +158,6 @@ public class CentralClient implements DiscountAgendaPort, CentralPortabilityPort
             if (response.getStatusCode() != HttpStatus.OK) {
                 throw new CentralUnavailableException("Resposta inesperada da Central");
             }
-
             CentralOperationStatusResponse payload = response.getBody();
             if (payload == null || isBlank(payload.status())) {
                 throw new CentralUnavailableException("Resposta inesperada da Central");
@@ -213,36 +179,21 @@ public class CentralClient implements DiscountAgendaPort, CentralPortabilityPort
     }
 
     @Override
-    public ReceivingAccount updateReceivingAccount(
-            String protocol,
-            ReceivingAccount receivingAccount
-    ) {
-        Map<String, Object> payload = new LinkedHashMap<>();
-        payload.put("protocolo", protocol);
-        payload.put("banco", receivingAccount.bank());
-        payload.put("agencia", receivingAccount.agency());
-        payload.put("conta", receivingAccount.account());
-
+    public ReceivingAccount updateReceivingAccount(String protocol, ReceivingAccount receivingAccount) {
+        CentralRequestCodec.SignedRequest request = codec.accountUpdate(protocol, receivingAccount);
         try {
-            String canonicalBody = objectMapper.writeValueAsString(payload);
-            String signature = signaturePort.sign(canonicalBody);
-            payload.put("assinatura", signature);
-            String body = objectMapper.writeValueAsString(payload);
-
             ResponseEntity<CentralReceivingAccountResponse> response = restClient.put()
                     .uri("/operacoes-portabilidade/{protocol}/conta-recebimento", protocol)
                     .contentType(MediaType.APPLICATION_JSON)
-                    .header("X-Signature", signature)
-                    .body(body)
+                    .header("X-Signature", request.signature())
+                    .body(request.body())
                     .retrieve()
                     .toEntity(CentralReceivingAccountResponse.class);
 
             CentralReceivingAccountResponse result = response.getBody();
             if (response.getStatusCode() != HttpStatus.OK
-                    || result == null
-                    || isBlank(result.banco())
-                    || isBlank(result.agencia())
-                    || isBlank(result.conta())) {
+                    || result == null || isBlank(result.banco())
+                    || isBlank(result.agencia()) || isBlank(result.conta())) {
                 throw new CentralUnavailableException("Resposta inesperada da Central");
             }
             return new ReceivingAccount(result.banco(), result.agencia(), result.conta());
@@ -261,6 +212,10 @@ public class CentralClient implements DiscountAgendaPort, CentralPortabilityPort
         } catch (NumberFormatException exception) {
             throw new CentralUnavailableException("Retry-After inválido da Central", exception);
         }
+    }
+
+    private static boolean isBlank(String value) {
+        return value == null || value.isBlank();
     }
 
     private record CentralAuthorizationResponse(String autorizacaoId) {

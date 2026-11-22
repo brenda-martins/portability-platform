@@ -1,4 +1,4 @@
-package com.portability.adapters.out.persistence;
+package com.portability.adapters.out.persistence.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;

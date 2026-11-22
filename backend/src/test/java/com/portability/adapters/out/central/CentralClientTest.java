@@ -130,12 +130,17 @@ class CentralClientTest {
     }
 
     @Test
-    void mustSendPayloadSignedEUuseIdReturnedByCentral() {
+    void mustSendSignedPayloadAndUseIdReturnedByCentral() throws Exception {
         String authorizationId = client.registerAuthorization("BEN-123", "AGR-001");
 
         assertEquals("AUT-1", authorizationId);
-        assertEquals("{\"beneficiarioId\":\"BEN-123\",\"convenioId\":\"AGR-001\"}", receivedBody);
-        assertEquals(signatureService.sign(receivedBody), receivedSignature);
+        JsonNode payload = new ObjectMapper().readTree(receivedBody);
+        assertEquals("BEN-123", payload.path("beneficiarioId").asText());
+        assertEquals("AGR-001", payload.path("convenioId").asText());
+        String canonical = "{\"beneficiarioId\":\"BEN-123\",\"convenioId\":\"AGR-001\"}";
+        String expectedSignature = signatureService.sign(canonical);
+        assertEquals(expectedSignature, payload.path("assinatura").asText());
+        assertEquals(expectedSignature, receivedSignature);
     }
 
     @Test

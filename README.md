@@ -170,13 +170,19 @@ Ver [`AGENTS.md`](AGENTS.md), seção "Agentes e skills".
 | Método | Endpoint | Resposta | Descrição |
 | --- | --- | --- | --- |
 | `GET` | `/api/health` | `200` | Verificação de disponibilidade |
-| `POST` | `/api/authorizations` | `201`, `200` (reenvio), `400`, `502` | Registrar opt-in do beneficiário |
+| `POST` | `/api/authorizations` | `201`, `200` (reenvio), `400`, `409`, `502` | Registrar opt-in do beneficiário |
 | `GET` | `/api/beneficiaries/{beneficiaryId}/agenda` | `200`, `400`, `403`, `502` | Listar parcelas da agenda de beneficiário autorizado |
-| `POST` | `/api/portability` | `201`, `200` (reenvio), `400`, `403`, `502` | Registrar operação de portabilidade com conta de recebimento |
-| `GET` | `/api/portability/{operationId}` | `200`, `404`, `502` | Consultar status da operação (acompanha a confirmação na Central) |
+| `POST` | `/api/portability` | `201`, `200` (reenvio), `400`, `403`, `409`, `502` | Registrar operação de portabilidade com conta de recebimento |
+| `GET` | `/api/portability/{operationId}` | `200`, `400`, `404`, `409`, `502` | Consultar status da operação (acompanha a confirmação na Central) |
 | `PUT` | `/api/portability/{operationId}/receiving-account` | `200`, `400`, `404`, `409`, `502` | Atualizar a conta de recebimento após a confirmação |
-| `GET` | `/api/portability/{operationId}/audit` | `200`, `404` | Consultar trilha de eventos da operação |
+| `GET` | `/api/portability/{operationId}/audit` | `200`, `400`, `404` | Consultar trilha de eventos da operação |
 
+Todas as respostas levam o header `X-Correlation-Id` (reaproveitado da requisição, quando enviado).
+Erros da API usam `{ "message": "...", "fields": { ... }, "correlationId": "..." }`; `fields` aparece
+somente em erros de validação e `correlationId`, quando há contexto de requisição. Os códigos seguem o
+domínio: `400` entrada inválida, `403` beneficiário sem `opt-in`, `404` operação inexistente, `409`
+operação não confirmada, versão desatualizada ou par beneficiário+convênio já autorizado, `502` falha da
+Central.
 
 ### Central de Convênios simulada (`/central`)
 
@@ -193,7 +199,7 @@ Payloads da Central:
 
 ```json
 // POST /central/autorizacoes
-{ "beneficiarioId": "BEN-123", "convenioId": "AGR-001" }
+{ "beneficiarioId": "BEN-123", "convenioId": "AGR-001", "assinatura": "..." }
 // resposta 201
 { "autorizacaoId": "AUT-3f4b..." }
 
@@ -273,8 +279,8 @@ memória com `ddl-auto: create-drop`. Mapeamentos de domínio em
 | Coluna | Tipo | Observação |
 | --- | --- | --- |
 | `authorization_id` | String (PK) | Identificador único da autorização |
-| `beneficiary_id` | String (not null) | Beneficiário |
-| `agreement_id` | String (not null) | Convênio de origem |
+| `beneficiary_id` | String (not null) | Beneficiário; único em conjunto com `agreement_id` |
+| `agreement_id` | String (not null) | Convênio de origem; único em conjunto com `beneficiary_id` |
 | `created_at` | Instant (not null) | Momento do opt-in |
 
 ### `portability_operations`
@@ -290,6 +296,7 @@ memória com `ddl-auto: create-drop`. Mapeamentos de domínio em
 | `protocol` | String | Protocolo fornecido pela Central |
 | `rejection_reason` | String | Preenchido quando `REJECTED` |
 | `requested_at` | Instant (not null) | Momento da solicitação |
+| `version` | Long (not null) | Versão otimista (`@Version`) conferida a cada transição |
 
 As parcelas selecionadas são armazenadas na tabela de coleção `operation_installments`
 (`operation_id`, `installment_id`, `position`), mapeada por `@ElementCollection` com `@OrderColumn` para

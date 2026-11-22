@@ -1,5 +1,6 @@
 package com.portability.adapters.out.persistence;
 
+import com.portability.adapters.out.persistence.entity.AuditEventJpaEntity;
 import com.portability.domain.model.AuditEvent;
 import com.portability.domain.ports.out.AuditEventRepository;
 import org.springframework.stereotype.Component;

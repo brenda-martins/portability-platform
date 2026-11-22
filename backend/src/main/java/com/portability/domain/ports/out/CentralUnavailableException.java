@@ -1,6 +1,8 @@
 package com.portability.domain.ports.out;
 
-public class CentralUnavailableException extends RuntimeException {
+import com.portability.domain.model.DomainException;
+
+public class CentralUnavailableException extends DomainException {
 
     public CentralUnavailableException(String message) {
         super(message);

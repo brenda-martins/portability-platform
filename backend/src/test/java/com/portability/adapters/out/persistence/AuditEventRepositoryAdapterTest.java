@@ -1,5 +1,6 @@
 package com.portability.adapters.out.persistence;
 
+import com.portability.adapters.out.persistence.entity.AuditEventJpaEntity;
 import com.portability.domain.model.AuditEvent;
 import com.portability.domain.ports.out.AuditEventRepository;
 import org.junit.jupiter.api.Test;
@@ -10,8 +11,11 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @SpringBootTest
 @ActiveProfiles("test")
@@ -34,8 +38,10 @@ class AuditEventRepositoryAdapterTest {
                 springRepository.findByOperationIdOrderByOccurredAtAsc("OPE-1");
 
         assertEquals(2, stored.size());
-        assertEquals("SOLICITADA", stored.get(0).getEventType());
-        assertEquals("CONFIRMADA", stored.get(1).getEventType());
+        assertEquals(Set.of("SOLICITADA", "CONFIRMADA"), stored.stream()
+                .map(AuditEventJpaEntity::getEventType)
+                .collect(Collectors.toSet()));
+        assertTrue(stored.stream().allMatch(event -> occurredAt.equals(event.getOccurredAt())));
     }
 
     @Test

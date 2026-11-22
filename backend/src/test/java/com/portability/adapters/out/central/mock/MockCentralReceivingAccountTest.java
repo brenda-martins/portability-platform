@@ -1,15 +1,18 @@
 package com.portability.adapters.out.central.mock;
 
 import com.portability.adapters.out.central.HmacSignatureService;
+import com.portability.domain.model.ReceivingAccount;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import tools.jackson.databind.ObjectMapper;
 
 import java.util.Map;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class MockCentralReceivingAccountTest {
 
@@ -31,6 +34,10 @@ class MockCentralReceivingAccountTest {
         assertEquals("002", body.get("banco"));
         assertEquals("4321", body.get("agencia"));
         assertEquals("98765-4", body.get("conta"));
+
+        Optional<ReceivingAccount> stored = controller.accountFor(protocol);
+        assertTrue(stored.isPresent());
+        assertEquals(new ReceivingAccount("002", "4321", "98765-4"), stored.get());
     }
 
     @Test
@@ -44,6 +51,7 @@ class MockCentralReceivingAccountTest {
 
         assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
         assertNull(response.getBody());
+        assertTrue(controller.accountFor(protocol).isEmpty());
     }
 
     @Test
@@ -55,6 +63,7 @@ class MockCentralReceivingAccountTest {
                 protocol, withSignature(canonical, "assinatura-invalida"), "assinatura-invalida");
 
         assertEquals(HttpStatus.UNAUTHORIZED, response.getStatusCode());
+        assertTrue(controller.accountFor(protocol).isEmpty());
     }
 
     @Test
@@ -67,6 +76,7 @@ class MockCentralReceivingAccountTest {
                 protocol, withSignature(canonical, signature), signature);
 
         assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+        assertTrue(controller.accountFor(protocol).isEmpty());
     }
 
     private String registerPortability(String beneficiaryId) {

@@ -1,4 +1,4 @@
-package com.portability.adapters.out.persistence;
+package com.portability.adapters.out.persistence.entity;
 
 import com.portability.domain.model.OperationStatus;
 import jakarta.persistence.CollectionTable;
@@ -165,9 +165,5 @@ public class OperationJpaEntity {
 
     public long getVersion() {
         return version;
-    }
-
-    public void setVersion(long version) {
-        this.version = version;
     }
 }

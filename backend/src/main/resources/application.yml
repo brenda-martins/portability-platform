@@ -14,8 +14,10 @@ spring:
 server:
   port: 8080
 
+logging:
+  pattern:
+    level: "%5p [${spring.application.name},%X{correlationId:-}]"
+
 central:
   base-url: http://localhost:8080/central
   hmac-secret: ${CENTRAL_HMAC_SECRET:dev-secret-change-me}
-  mock:
-    enabled: true

@@ -3,6 +3,7 @@ package com.portability.adapters.in.web;
 import com.portability.domain.model.BeneficiaryNotAuthorizedException;
 import com.portability.domain.model.DiscountInstallment;
 import com.portability.domain.model.InstallmentStatus;
+import com.portability.domain.model.InvalidRequestException;
 import com.portability.domain.ports.in.GetDiscountAgendaUseCase;
 import com.portability.domain.ports.out.CentralUnavailableException;
 import org.junit.jupiter.api.BeforeEach;
@@ -61,11 +62,12 @@ class AgendaControllerContractTest {
     @Test
     void shouldRespond400WhenBeneficiaryIdIsBlank() throws Exception {
         when(getDiscountAgendaUseCase.getAgenda(" "))
-                .thenThrow(new IllegalArgumentException("beneficiaryId must not be blank"));
+                .thenThrow(new InvalidRequestException("beneficiaryId", "beneficiaryId must not be blank"));
 
         mockMvc.perform(get("/api/beneficiaries/{beneficiaryId}/agenda", " "))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").exists());
+                .andExpect(jsonPath("$.message").exists())
+                .andExpect(jsonPath("$.fields.beneficiaryId").value("beneficiaryId must not be blank"));
     }
 
     @Test

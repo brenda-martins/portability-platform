@@ -9,13 +9,11 @@ public record Authorization(
         Instant createdAt
 ) {
     public Authorization {
-        requireNotBlank(beneficiaryId, "beneficiaryId");
-        requireNotBlank(agreementId, "agreementId");
-    }
-
-    private static void requireNotBlank(String value, String field) {
-        if (value == null || value.isBlank()) {
-            throw new IllegalArgumentException(field + " must not be blank");
+        Validation.requireNotBlank(authorizationId, "authorizationId");
+        Validation.requireNotBlank(beneficiaryId, "beneficiaryId");
+        Validation.requireNotBlank(agreementId, "agreementId");
+        if (createdAt == null) {
+            throw new InvalidRequestException("createdAt", "createdAt must not be null");
         }
     }
 }

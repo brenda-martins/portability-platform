@@ -11,22 +11,16 @@ public record DiscountInstallment(
         InstallmentStatus status
 ) {
     public DiscountInstallment {
-        requireNotBlank(installmentId, "installmentId");
-        requireNotBlank(agreementId, "agreementId");
+        Validation.requireNotBlank(installmentId, "installmentId");
+        Validation.requireNotBlank(agreementId, "agreementId");
         if (amount == null) {
-            throw new IllegalArgumentException("amount must not be null");
+            throw new InvalidRequestException("amount", "amount must not be null");
         }
         if (discountDate == null) {
-            throw new IllegalArgumentException("discountDate must not be null");
+            throw new InvalidRequestException("discountDate", "discountDate must not be null");
         }
         if (status == null) {
-            throw new IllegalArgumentException("status must not be null");
-        }
-    }
-
-    private static void requireNotBlank(String value, String field) {
-        if (value == null || value.isBlank()) {
-            throw new IllegalArgumentException(field + " must not be blank");
+            throw new InvalidRequestException("status", "status must not be null");
         }
     }
 }

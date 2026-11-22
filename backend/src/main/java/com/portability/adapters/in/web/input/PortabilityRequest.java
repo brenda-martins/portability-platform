@@ -1,16 +1,30 @@
 package com.portability.adapters.in.web.input;
 
-import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotEmpty;
-import jakarta.validation.constraints.NotNull;
+import com.portability.domain.model.InvalidRequestException;
+import com.portability.domain.model.ReceivingAccount;
+import com.portability.domain.model.Validation;
 
 import java.util.List;
 
+/** Edge DTO; field invariants are owned by the domain. */
 public record PortabilityRequest(
-        @NotBlank String beneficiaryId,
-        @NotEmpty List<@NotBlank String> installmentIds,
-        @NotBlank String creditorAssignee,
-        @Valid @NotNull ReceivingAccountRequest receivingAccount
+        String beneficiaryId,
+        List<String> installmentIds,
+        String creditorAssignee,
+        ReceivingAccountRequest receivingAccount
 ) {
+    public void validate() {
+        Validation.requireNotBlank(beneficiaryId, "beneficiaryId");
+        Validation.requireNotBlank(creditorAssignee, "creditorAssignee");
+        Validation.requireSelection(installmentIds);
+        account();
+    }
+
+    public ReceivingAccount account() {
+        if (receivingAccount == null) {
+            throw new InvalidRequestException(
+                    "receivingAccount", "receivingAccount must not be null");
+        }
+        return receivingAccount.toAccount();
+    }
 }

@@ -1,9 +1,11 @@
 package com.portability.adapters.out.persistence;
 
-import com.portability.domain.model.OperationStatus;
+import com.portability.adapters.out.persistence.entity.OperationJpaEntity;
+import com.portability.domain.model.ConcurrentOperationException;
 import com.portability.domain.model.PortabilityOperation;
 import com.portability.domain.model.ReceivingAccount;
 import com.portability.domain.ports.out.OperationRepository;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -22,19 +24,22 @@ public class OperationRepositoryAdapter implements OperationRepository {
     @Override
     public PortabilityOperation save(PortabilityOperation operation, String idempotencyKey) {
         OperationJpaEntity entity = new OperationJpaEntity();
-        entity.setOperationId(operation.operationId());
-        entity.setBeneficiaryId(operation.beneficiaryId());
+        applyState(entity, operation);
         entity.setIdempotencyKey(idempotencyKey);
-        entity.setInstallmentIds(new ArrayList<>(operation.installmentIds()));
-        entity.setCreditorAssignee(operation.creditorAssignee());
-        entity.setBank(operation.receivingAccount().bank());
-        entity.setAgency(operation.receivingAccount().agency());
-        entity.setAccount(operation.receivingAccount().account());
-        entity.setStatus(operation.status());
-        entity.setProtocol(operation.protocol());
-        entity.setRejectionReason(operation.rejectionReason());
-        entity.setRequestedAt(operation.requestedAt());
-        return toDomain(repository.save(entity));
+        return persist(entity);
+    }
+
+    @Override
+    public PortabilityOperation save(PortabilityOperation operation) {
+        OperationJpaEntity entity = repository.findById(operation.operationId())
+                .orElseThrow(() -> new ConcurrentOperationException(
+                        "Operação não encontrada: " + operation.operationId()));
+        if (entity.getVersion() != operation.version()) {
+            throw new ConcurrentOperationException(
+                    "Operação alterada por outra requisição; tente novamente");
+        }
+        applyState(entity, operation);
+        return persist(entity);
     }
 
     @Override
@@ -48,28 +53,27 @@ public class OperationRepositoryAdapter implements OperationRepository {
         return repository.findById(operationId).map(OperationRepositoryAdapter::toDomain);
     }
 
-    @Override
-    public Optional<PortabilityOperation> findByProtocol(String protocol) {
-        return repository.findByProtocol(protocol).map(OperationRepositoryAdapter::toDomain);
+    private PortabilityOperation persist(OperationJpaEntity entity) {
+        try {
+            return toDomain(repository.saveAndFlush(entity));
+        } catch (OptimisticLockingFailureException exception) {
+            throw new ConcurrentOperationException(
+                    "Operação alterada por outra requisição; tente novamente", exception);
+        }
     }
 
-    @Override
-    public PortabilityOperation updateStatus(String operationId, OperationStatus status, String rejectionReason) {
-        OperationJpaEntity entity = repository.findById(operationId)
-                .orElseThrow(() -> new IllegalArgumentException("Operação não encontrada: " + operationId));
-        entity.setStatus(status);
-        entity.setRejectionReason(rejectionReason);
-        return toDomain(repository.save(entity));
-    }
-
-    @Override
-    public PortabilityOperation updateReceivingAccount(String operationId, ReceivingAccount receivingAccount) {
-        OperationJpaEntity entity = repository.findById(operationId)
-                .orElseThrow(() -> new IllegalArgumentException("Operação não encontrada: " + operationId));
-        entity.setBank(receivingAccount.bank());
-        entity.setAgency(receivingAccount.agency());
-        entity.setAccount(receivingAccount.account());
-        return toDomain(repository.save(entity));
+    private static void applyState(OperationJpaEntity entity, PortabilityOperation operation) {
+        entity.setOperationId(operation.operationId());
+        entity.setBeneficiaryId(operation.beneficiaryId());
+        entity.setInstallmentIds(new ArrayList<>(operation.installmentIds()));
+        entity.setCreditorAssignee(operation.creditorAssignee());
+        entity.setBank(operation.receivingAccount().bank());
+        entity.setAgency(operation.receivingAccount().agency());
+        entity.setAccount(operation.receivingAccount().account());
+        entity.setStatus(operation.status());
+        entity.setProtocol(operation.protocol());
+        entity.setRejectionReason(operation.rejectionReason());
+        entity.setRequestedAt(operation.requestedAt());
     }
 
     private static PortabilityOperation toDomain(OperationJpaEntity entity) {
@@ -82,6 +86,7 @@ public class OperationRepositoryAdapter implements OperationRepository {
                 entity.getStatus(),
                 entity.getProtocol(),
                 entity.getRejectionReason(),
-                entity.getRequestedAt());
+                entity.getRequestedAt(),
+                entity.getVersion());
     }
 }

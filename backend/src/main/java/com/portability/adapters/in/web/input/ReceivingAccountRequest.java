@@ -1,10 +1,14 @@
 package com.portability.adapters.in.web.input;
 
-import jakarta.validation.constraints.NotBlank;
+import com.portability.domain.model.ReceivingAccount;
 
-public record ReceivingAccountRequest(
-        @NotBlank String bank,
-        @NotBlank String agency,
-        @NotBlank String account
-) {
+public record ReceivingAccountRequest(String bank, String agency, String account) {
+
+    public void validate() {
+        toAccount();
+    }
+
+    public ReceivingAccount toAccount() {
+        return new ReceivingAccount(bank, agency, account);
+    }
 }

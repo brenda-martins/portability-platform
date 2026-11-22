@@ -6,11 +6,11 @@
 
 ## Escopo
 
-Uma fatia vertical no backend: leitura da operação, consulta sem assinatura à Central, interpretação de
-`Retry-After`, política de backoff, persistência da transição, evento de auditoria, endpoint
-`GET /api/portability/{operationId}`, mock da Central e testes. O frontend já tem o
-botão "Consultar status"; a F04 só cobre o contrato com o endpoint. F05, F06 e F07 continuam como stubs
-honestos.
+Leitura da operação, consulta sem assinatura à Central, interpretação de `Retry-After`, política de
+backoff, persistência da transição, evento de auditoria, endpoint `GET /api/portability/{operationId}`,
+mock da Central e testes. O frontend já tem o botão "Consultar status"; a F04 só cobre o contrato com o
+endpoint. As decisões comuns — transações, versão do agregado, erros, correlation id, métricas e
+assemblagem — estão em [`../../lld.md`](../../lld.md).
 
 ## Contratos
 
@@ -19,11 +19,14 @@ honestos.
 | Método | Rota | Situação | Resposta |
 | --- | --- | --- | --- |
 | `GET` | `/api/portability/{operationId}` | operação encontrada (inclusive ainda pendente) | `200` com `PortabilityOperation` |
+| `GET` | `/api/portability/{operationId}` | `operationId` em branco | `400` com `{ "message": "...", "fields": {...} }` |
 | `GET` | `/api/portability/{operationId}` | operação inexistente | `404` |
+| `GET` | `/api/portability/{operationId}` | versão desatualizada | `409` com `{ "message": "..." }` |
 | `GET` | `/api/portability/{operationId}` | falha na consulta à Central | `502` com `{ "message": "..." }` |
 
 O corpo de sucesso é o mesmo `PortabilityOperation` da F03, com `status` atualizado e `rejectionReason`
-preenchido quando aplicável. Nenhuma coluna ou campo novo é acrescentado.
+preenchido quando aplicável. Nenhuma coluna ou campo novo é acrescentado ao contrato; a `version` do
+agregado não é serializada.
 
 ### Central simulada
 
@@ -47,53 +50,64 @@ gera; essa simulação pertence à F07.
 - Com o mock da F04, as esperas são `1s` e `2s`. Não há espera depois da última consulta.
 - Se a terceira consulta ainda devolver `PENDENTE`, a operação permanece `PENDING` e a resposta é `200`;
   a próxima chamada retoma o acompanhamento.
+- Uma interrupção durante o backoff restaura a flag do thread e devolve a operação como estava. A
+  confirmação continua no caminho do `GET` (decisão de manter polling); não há worker nem evento
+  assíncrono.
 
 ### Ports e modelo
 
-- `CentralOperationStatus` passa a ser `record CentralOperationStatus(OperationStatus status, String
+- `CentralOperationStatus` é `record CentralOperationStatus(OperationStatus status, String
   rejectionReason, Duration retryAfter)`. `PENDING` representa o `204`/`PENDENTE`; `retryAfter` é
   `Duration.ZERO` para status finais ou quando a Central não informa o cabeçalho.
-- Novo port de saída `BackoffPort.await(Duration)`: aplica a espera. O domínio continua sem framework; a
-  política de backoff fica no caso de uso, e o adapter apenas dorme a thread.
-- `OperationRepository.findById` e `findByProtocol` deixam de ser stubs; `updateStatus(operationId,
-  status, rejectionReason)` atualiza somente esses dois campos e devolve a operação reconstruída, sem
-  tocar em chave de idempotência, parcelas, conta nem `requestedAt`.
+- `BackoffPort.await(Duration)` aplica a espera. O domínio continua sem framework; a política de backoff
+  fica no caso de uso, e o adapter apenas dorme a thread.
+- `OperationRepository.findById` localiza a operação; `save(PortabilityOperation)` persiste o agregado
+  inteiro e confere a versão lida pelo chamador. Não existem `findByProtocol`, `updateStatus` nem
+  atualizações por campo.
+- `PortabilityOperation.transitionTo(status, rejectionReason)` controla a transição `PENDING ->
+  CONFIRMED/REJECTED`, guarda o motivo e devolve um novo record com a mesma versão.
 
 ## Decisões de implementação
 
 - `CentralClient.consultStatus` faz o `GET` pelo protocolo, converte `204` em `PENDING` com o
   `Retry-After` do cabeçalho, traduz `CONFIRMADA`/`REJEITADA` para o enum interno e converte status
   diferente de `200`/`204`, corpo inválido, status desconhecido ou cabeçalho inválido em
-  `CentralUnavailableException`. Aplicação trata a exceção como `502`, pela regra já existente.
-- `PortabilityApplicationService.getOperationStatus` busca a operação pelo id; se o status não for
-  `PENDING`, devolve a operação sem consultar a Central. Para operação pendente, executa o loop de até
-  três consultas, usando `BackoffPort` entre tentativas. Ao receber status final, chama
-  `OperationRepository.updateStatus` e anexa um `AuditEvent` com tipo igual ao status final e mensagem
-  com o protocolo (e o motivo, quando houver). Falha da Central propaga sem gravar nada.
-- `MockCentralController.getStatus` troca o `501`: usa um mapa em memória de protocolo para número de
-  consultas, devolve `204` com `Retry-After: 1` nas duas primeiras e `200` com `CONFIRMADA` depois.
-  Protocolo ausente do mapa responde `404`. Nenhum dado é inventado para protocolo desconhecido.
-- `OperationRepositoryAdapter` implementa as três operações com conversão explícita entre entidade JPA e
-  domínio; `findByProtocol` usa o método já existente em `SpringDataOperationRepository`.
-- `ThreadBackoffAdapter` (em `adapters/out/timing`) implementa `BackoffPort` com `Thread.sleep` e
-  restaura o flag de interrupção. Nos testes unitários, um fake registra as durações sem dormir.
+  `CentralUnavailableException`. A aplicação traduz a exceção em `502`, pela regra já existente.
+- `GetOperationStatusService` valida o id, busca a operação pelo id e devolve vazio quando não existe.
+  Operação já finalizada não consulta a Central. Para operação pendente, executa o loop de até três
+  consultas, usando `BackoffPort` entre tentativas. Ao receber status final, chama
+  `transitionTo`, persiste com `save(operation)` e anexa um `AuditEvent` com tipo igual ao status final e
+  mensagem com o protocolo (e o motivo, quando houver), tudo em uma unidade de trabalho. Um evento
+  terminal já registrado não é duplicado; versão desatualizada vira `ConcurrentOperationException`
+  (`409`). Falha da Central é registrada como `FALHA_INTEGRACAO` (F07) e propagada sem gravar transição.
+- `MockCentralController.getStatus` usa um mapa em memória de protocolo para número de consultas,
+  devolve `204` com `Retry-After: 1` nas duas primeiras e `200` com `CONFIRMADA` depois. Protocolo
+  ausente do mapa responde `404`. Nenhum dado é inventado para protocolo desconhecido.
+- `OperationRepositoryAdapter` implementa as leituras e `save(operation)` com conversão explícita entre
+  entidade JPA e domínio, conferindo a versão esperada.
+- `ThreadBackoffAdapter` (em `adapters/out/timing`) implementa `BackoffPort` com `Thread.sleep` e restaura
+  o flag de interrupção. Nos testes unitários, um fake registra as durações sem dormir.
 - `PortabilityController` passa a injetar `GetOperationStatusUseCase` e responder com
-  `ResponseEntity.of(...)`, que produz `200` ou `404` sem exceção própria. O construtor existente ganha
-  o segundo parâmetro e o teste de contrato é ajustado.
+  `ResponseEntity.of(...)`, que produz `200` ou `404` sem exceção própria. A resposta usa o DTO
+  `OperationResponse`, sem a `version` do agregado.
 - Nenhuma dependência nova: `Duration`, `Thread.sleep` e as bibliotecas já presentes atendem à F04.
 
 ## Decisões de teste
 
-- `PortabilityApplicationServiceTest`: operação pendente que confirma após duas esperas (com as durações
+- `GetOperationStatusServiceTest`: operação pendente que confirma após duas esperas (com as durações
   registradas pelo fake), operação final sem chamada à Central, rejeição com motivo e evento, esgotamento
-  das tentativas mantendo `PENDING`, falha da Central sem gravação e id inexistente devolvendo vazio.
+  das tentativas mantendo `PENDING`, falha da Central sem gravação de transição, interrupção do backoff,
+  evento terminal não duplicado, conflito de versão com rollback, id inexistente devolvendo vazio e id em
+  branco rejeitado antes de qualquer port. `OperationConfirmationConcurrencyTest` cobre a corrida de
+  confirmação com H2, e `OperationTransactionalTest`, a atomicidade da transição com o evento.
 - `CentralClientTest`: `204` + `Retry-After` viram `PENDING` com a duração correta, `200` traduz
   `CONFIRMADA` e `REJEITADA`, `500`/status desconhecido/cabeçalho inválido viram
   `CentralUnavailableException`, e o `GET` não envia assinatura.
 - `MockCentralStatusTest` (em processo): duas respostas `204` com `Retry-After`, a terceira `200` com
   `CONFIRMADA` e `404` para protocolo desconhecido.
-- `OperationRepositoryAdapterTest`: leitura por id e por protocolo e atualização de status preservando
-  os demais campos.
-- `PortabilityControllerContractTest`: `200`, `404` e `502` no `GET` por id.
+- `OperationRepositoryAdapterTest`: leitura por id, checagem de versão e persistência da transição
+  preservando os demais campos.
+- `PortabilityControllerContractTest`: `200`, `400`, `404`, `409` e `502` no `GET` por id;
+  `GetOperationStatusIntegrationTest` exerce o caminho completo com H2.
 - `App.test.tsx`: clique em "Consultar status" chama `GET /api/portability/{operationId}` e exibe o status
   atualizado, incluindo o motivo da rejeição.

@@ -1,8 +1,8 @@
 package com.portability.application;
 
-import com.portability.adapters.out.persistence.OperationJpaEntity;
 import com.portability.adapters.out.persistence.SpringDataOperationRepository;
 import com.portability.domain.model.AuditEvent;
+import com.portability.domain.model.ConcurrentOperationException;
 import com.portability.domain.model.DiscountInstallment;
 import com.portability.domain.model.InstallmentStatus;
 import com.portability.domain.model.OperationStatus;
@@ -19,7 +19,6 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
@@ -90,16 +89,15 @@ class OperationTransactionalTest {
 
     @Test
     void mustRejectStaleUpdateWithOptimisticLock() {
-        operationRepository.save(pendingOperation(), KEY);
-        OperationJpaEntity first = springOperations.findById(OPERATION_ID).orElseThrow();
-        OperationJpaEntity second = springOperations.findById(OPERATION_ID).orElseThrow();
-        first.setStatus(OperationStatus.CONFIRMED);
-        second.setStatus(OperationStatus.REJECTED);
+        PortabilityOperation saved = operationRepository.save(pendingOperation(), KEY);
+        PortabilityOperation current = saved.transitionTo(OperationStatus.CONFIRMED, null);
+        PortabilityOperation stale = saved.transitionTo(OperationStatus.REJECTED, "Convênio bloqueado");
 
-        springOperations.save(first);
+        operationRepository.save(current);
 
-        assertThrows(OptimisticLockingFailureException.class, () -> springOperations.save(second));
-        assertEquals(OperationStatus.CONFIRMED, springOperations.findById(OPERATION_ID).orElseThrow().getStatus());
+        assertThrows(ConcurrentOperationException.class, () -> operationRepository.save(stale));
+        assertEquals(OperationStatus.CONFIRMED,
+                operationRepository.findById(OPERATION_ID).orElseThrow().status());
     }
 
     private static PortabilityOperation pendingOperation() {

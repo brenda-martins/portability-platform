@@ -1,14 +1,17 @@
-package com.portability.adapters.out.persistence;
+package com.portability.adapters.out.persistence.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 
 import java.time.Instant;
 
 @Entity
-@Table(name = "authorizations")
+@Table(name = "authorizations", uniqueConstraints = @UniqueConstraint(
+        name = "uk_authorizations_beneficiary_agreement",
+        columnNames = {"beneficiary_id", "agreement_id"}))
 public class AuthorizationJpaEntity {
 
     @Id

@@ -4,6 +4,7 @@ import com.portability.adapters.out.persistence.SpringDataAuditEventRepository;
 import com.portability.adapters.out.persistence.SpringDataOperationRepository;
 import com.portability.domain.model.AuditEvent;
 import com.portability.domain.model.CentralOperationStatus;
+import com.portability.domain.model.ConcurrentOperationException;
 import com.portability.domain.model.OperationStatus;
 import com.portability.domain.model.PortabilityOperation;
 import com.portability.domain.model.ReceivingAccount;
@@ -31,7 +32,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.when;
 
@@ -104,7 +104,8 @@ class OperationConfirmationConcurrencyTest {
                 try {
                     assertTrue(future.get().isPresent());
                 } catch (ExecutionException exception) {
-                    assertInstanceOf(OptimisticLockingFailureException.class, exception.getCause());
+                    assertTrue(exception.getCause() instanceof ConcurrentOperationException
+                            || exception.getCause() instanceof OptimisticLockingFailureException);
                 }
             }
         } finally {

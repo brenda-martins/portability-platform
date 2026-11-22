@@ -2,6 +2,8 @@ package com.portability.adapters.out.persistence;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import com.portability.adapters.out.persistence.entity.AuthorizationJpaEntity;
+
 import java.util.Optional;
 
 public interface SpringDataAuthorizationRepository extends JpaRepository<AuthorizationJpaEntity, String> {

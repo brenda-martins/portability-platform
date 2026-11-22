@@ -6,9 +6,10 @@
 
 ## Escopo
 
-Completa os cenários de rejeição e falha da Central: gatilho determinístico no mock, evento de auditoria para
-falhas com operação existente e testes dos caminhos já traduzidos pelo adapter e pela UI. Não muda contrato
-HTTP da aplicação nem cria port, DTO, tabela ou dependência.
+Completa os cenários de rejeição e falha da Central: gatilho determinístico no mock, evento de auditoria
+para falhas com operação existente e testes dos caminhos já traduzidos pelo adapter e pela UI. Não muda
+contrato HTTP da aplicação nem cria port, DTO, tabela ou dependência. As decisões comuns — transações,
+erros, correlation id, métricas e assemblagem — estão em [`../../lld.md`](../../lld.md).
 
 ## Contratos
 
@@ -32,7 +33,7 @@ seguido da mensagem da exceção traduzida pelo adapter.
 ### Central simulada (`/central`)
 
 O desfecho é escolhido no registro, a partir do valor de `credorCessionario` (sem acentos, comparação
-case-insensitive), e guardado por protocolo:
+case-insensitive), e guardado por protocolo no enum `CreditorMarker`:
 
 | Marcador no credor | Desfecho nas consultas de status |
 | --- | --- |
@@ -47,26 +48,30 @@ timeouts e respostas inesperadas; o `CentralClient` mantém o read timeout de 2 
 
 ## Decisões de implementação
 
-- `MockCentralController` guarda um enum interno de desfecho por protocolo em `ConcurrentHashMap`, ao lado
-  dos contadores já existentes. Nenhum estado novo é exposto e nenhuma dependência é acrescentada.
+- `MockCentralController` guarda um `CreditorMarker` por protocolo em `ConcurrentHashMap`, ao lado dos
+  contadores já existentes. `markerFor` aplica a precedência de `REJEITAR`. Nenhum estado novo é exposto e
+  nenhuma dependência é acrescentada.
 - `CentralClient.consultStatus` continua traduzindo `REJEITADA` com motivo e qualquer resposta diferente de
   `200`/`204` em `CentralUnavailableException`; o `503` do mock não pede alteração no adapter.
-- `PortabilityApplicationService` captura `CentralUnavailableException` apenas ao redor da chamada ao port
-  da Central em `followStatus` e em `updateReceivingAccount`, anexa `FALHA_INTEGRACAO` e propaga a exceção.
-  Capturas locais evitam rotular falhas de repositório como falha de integração. Em `startPortability`,
-  `registerAuthorization` e `getAgenda` nada é anexado: a Central falha antes de existir uma operação.
-- A rejeição já é traduzida em F04 (`updateStatus` com motivo e evento `REJEITADA`); a F07 a torna
-  reproduzível e cobre o caminho completo com testes, sem alterar essa lógica.
+- `GetOperationStatusService` e `UpdateReceivingAccountService` capturam `CentralUnavailableException`
+  apenas ao redor da chamada ao port da Central, anexam `FALHA_INTEGRACAO` e propagam a exceção. Capturas
+  locais evitam rotular falhas de repositório como falha de integração. Em `StartPortabilityService`,
+  `RegisterAuthorizationService` e `GetDiscountAgendaService` nada é anexado: a Central falha antes de
+  existir uma operação.
+- A rejeição é traduzida em F04 (`transitionTo`, `save(operation)` com a versão esperada e evento
+  `REJEITADA` com o protocolo e o motivo); a F07 a torna reproduzível e cobre o caminho completo com
+  testes, sem alterar essa lógica.
 - O frontend não muda: `PortabilityPanel` já mostra `rejectionReason` e mensagens de erro `502`, e
   `AuditPanel` já exibe qualquer tipo de evento devolvido pela API.
 
 ## Decisões de teste
 
-- `MockCentralFailureScenariosTest` (novo, controller em processo): rejeição com motivo após duas consultas
+- `MockCentralFailureScenariosTest` (controller em processo): rejeição com motivo após duas consultas
   pendentes, `503` no marcador de falha e correspondência ignorando caixa.
 - `CentralClientTest`: `503` na consulta de status vira `CentralUnavailableException`.
-- `PortabilityApplicationServiceTest`: falha na consulta de status e na atualização de conta anexa
-  `FALHA_INTEGRACAO` com o ID da operação, sem `updateStatus`/`updateReceivingAccount` e sem backoff; falha
-  no registro continua sem operação e sem evento; rejeição continua gravando motivo e evento `REJEITADA`.
+- `GetOperationStatusServiceTest` e `UpdateReceivingAccountServiceTest`: falha na consulta de status e na
+  atualização de conta anexa `FALHA_INTEGRACAO` com o ID da operação, sem transição nem gravação e sem
+  backoff; falha no registro continua sem operação e sem evento; rejeição continua gravando motivo e evento
+  `REJEITADA`.
 - `App.test.tsx`: mensagem `502` na consulta de status com a operação ainda `PENDING` e evento
   `FALHA_INTEGRACAO` visível na trilha; rejeição com motivo já coberta permanece.

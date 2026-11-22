@@ -26,13 +26,6 @@ export interface ReceivingAccount {
   account: string;
 }
 
-export interface PortabilityRequest {
-  beneficiaryId: string;
-  installmentIds: string[];
-  creditorAssignee: string;
-  receivingAccount: ReceivingAccount;
-}
-
 export interface PortabilityOperation {
   operationId: string;
   status: 'PENDING' | 'CONFIRMED' | 'REJECTED';
