@@ -23,6 +23,7 @@ import com.portability.domain.ports.out.AuthorizationRepository;
 import com.portability.domain.ports.out.BackoffPort;
 import com.portability.domain.ports.out.CentralAuthorizationPort;
 import com.portability.domain.ports.out.CentralPortabilityPort;
+import com.portability.domain.ports.out.CentralUnavailableException;
 import com.portability.domain.ports.out.DiscountAgendaPort;
 import com.portability.domain.ports.out.OperationRepository;
 import com.portability.domain.ports.out.SignaturePort;
@@ -172,7 +173,13 @@ public class PortabilityApplicationService implements
         PortabilityOperation current = operation;
         for (int attempt = 1; attempt <= MAX_STATUS_ATTEMPTS && current.status() == OperationStatus.PENDING;
                 attempt++) {
-            CentralOperationStatus central = centralPortabilityPort.consultStatus(current.protocol());
+            CentralOperationStatus central;
+            try {
+                central = centralPortabilityPort.consultStatus(current.protocol());
+            } catch (CentralUnavailableException exception) {
+                appendIntegrationFailure(current.operationId(), "Falha ao consultar status na Central", exception);
+                throw exception;
+            }
             if (central.status() == OperationStatus.PENDING) {
                 if (attempt < MAX_STATUS_ATTEMPTS) {
                     backoffPort.await(backoffDelay(attempt, central.retryAfter()));
@@ -191,6 +198,16 @@ public class PortabilityApplicationService implements
             current = updated;
         }
         return current;
+    }
+
+    private void appendIntegrationFailure(String operationId, String context,
+            CentralUnavailableException exception) {
+        auditEventRepository.append(new AuditEvent(
+                UUID.randomUUID().toString(),
+                operationId,
+                "FALHA_INTEGRACAO",
+                context + ": " + exception.getMessage(),
+                Instant.now()));
     }
 
     private static Duration backoffDelay(int attempt, Duration retryAfter) {
@@ -236,7 +253,12 @@ public class PortabilityApplicationService implements
             return existing;
         }
 
-        centralPortabilityPort.updateReceivingAccount(operation.protocol(), receivingAccount);
+        try {
+            centralPortabilityPort.updateReceivingAccount(operation.protocol(), receivingAccount);
+        } catch (CentralUnavailableException exception) {
+            appendIntegrationFailure(operationId, "Falha ao atualizar conta na Central", exception);
+            throw exception;
+        }
         PortabilityOperation updated = operationRepository.updateReceivingAccount(operationId, receivingAccount);
         auditEventRepository.append(new AuditEvent(
                 UUID.randomUUID().toString(),

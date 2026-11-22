@@ -21,6 +21,7 @@ import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -39,6 +40,11 @@ public class MockCentralController {
     private final Set<String> registeredProtocols = ConcurrentHashMap.newKeySet();
     private final Map<String, AtomicInteger> statusConsultations = new ConcurrentHashMap<>();
     private final Map<String, Map<String, String>> updatedAccounts = new ConcurrentHashMap<>();
+    private final Map<String, StatusOutcome> statusOutcomes = new ConcurrentHashMap<>();
+
+    private enum StatusOutcome {
+        CONFIRMADA, REJEITADA, FALHA
+    }
 
     public MockCentralController(SignaturePort signaturePort, ObjectMapper objectMapper) {
         this.signaturePort = signaturePort;
@@ -124,7 +130,19 @@ public class MockCentralController {
         String protocol = "PRT-" + UUID.nameUUIDFromBytes(canonicalBody.getBytes(StandardCharsets.UTF_8))
                 .toString().replace("-", "");
         registeredProtocols.add(protocol);
+        statusOutcomes.put(protocol, outcomeFor(payload.path("credorCessionario").asText("")));
         return ResponseEntity.status(HttpStatus.ACCEPTED).body(Map.of("protocolo", protocol));
+    }
+
+    private static StatusOutcome outcomeFor(String creditorAssignee) {
+        String value = creditorAssignee == null ? "" : creditorAssignee.toUpperCase(Locale.ROOT);
+        if (value.contains("REJEITAR")) {
+            return StatusOutcome.REJEITADA;
+        }
+        if (value.contains("FALHA")) {
+            return StatusOutcome.FALHA;
+        }
+        return StatusOutcome.CONFIRMADA;
     }
 
     private static boolean isValidPortabilityPayload(JsonNode payload) {
@@ -154,14 +172,19 @@ public class MockCentralController {
         if (isBlank(protocol) || !registeredProtocols.contains(protocol)) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
         }
+        StatusOutcome outcome = statusOutcomes.getOrDefault(protocol, StatusOutcome.CONFIRMADA);
+        if (outcome == StatusOutcome.FALHA) {
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).build();
+        }
         int consultations = statusConsultations.computeIfAbsent(protocol, key -> new AtomicInteger())
                 .incrementAndGet();
         if (consultations <= 2) {
             return ResponseEntity.noContent().header(HttpHeaders.RETRY_AFTER, "1").build();
         }
         Map<String, Object> body = new LinkedHashMap<>();
-        body.put("status", "CONFIRMADA");
-        body.put("motivoRejeicao", null);
+        body.put("status", outcome == StatusOutcome.REJEITADA ? "REJEITADA" : "CONFIRMADA");
+        body.put("motivoRejeicao", outcome == StatusOutcome.REJEITADA
+                ? "Convênio de origem não autoriza a portabilidade" : null);
         return ResponseEntity.ok(body);
     }
 

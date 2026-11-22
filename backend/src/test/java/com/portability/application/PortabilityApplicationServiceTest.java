@@ -415,15 +415,22 @@ class PortabilityApplicationServiceTest {
     }
 
     @Test
-    void mustNotChangeOperationWhenCentralStatusConsultationFails() {
+    void mustRecordFailureEventWithoutChangingOperationWhenCentralStatusConsultationFails() {
         when(operationRepository.findById("OPE-1")).thenReturn(Optional.of(operation("OPE-1")));
         when(centralPortabilityPort.consultStatus("PRT-OLD"))
                 .thenThrow(new CentralUnavailableException("Central indisponível"));
 
-        assertThrows(CentralUnavailableException.class, () -> service.getOperationStatus("OPE-1"));
+        CentralUnavailableException error = assertThrows(CentralUnavailableException.class,
+                () -> service.getOperationStatus("OPE-1"));
 
+        assertEquals("Central indisponível", error.getMessage());
         verify(operationRepository, never()).updateStatus(anyString(), any(), any());
-        verifyNoInteractions(auditEventRepository, backoffPort);
+        verifyNoInteractions(backoffPort);
+        ArgumentCaptor<AuditEvent> event = ArgumentCaptor.forClass(AuditEvent.class);
+        verify(auditEventRepository).append(event.capture());
+        assertEquals("FALHA_INTEGRACAO", event.getValue().eventType());
+        assertEquals("OPE-1", event.getValue().operationId());
+        assertTrue(event.getValue().message().contains("Central indisponível"));
     }
 
     @Test
@@ -507,7 +514,7 @@ class PortabilityApplicationServiceTest {
     }
 
     @Test
-    void mustNotPersistAccountWhenCentralFails() {
+    void mustRecordFailureEventWithoutPersistingAccountWhenCentralFails() {
         when(operationRepository.findById("OPE-1"))
                 .thenReturn(Optional.of(operation("OPE-1", OperationStatus.CONFIRMED, null)));
         when(centralPortabilityPort.updateReceivingAccount("PRT-OLD", newAccount()))
@@ -517,7 +524,11 @@ class PortabilityApplicationServiceTest {
                 () -> service.updateReceivingAccount("OPE-1", newAccount()));
 
         verify(operationRepository, never()).updateReceivingAccount(anyString(), any());
-        verifyNoInteractions(auditEventRepository);
+        ArgumentCaptor<AuditEvent> event = ArgumentCaptor.forClass(AuditEvent.class);
+        verify(auditEventRepository).append(event.capture());
+        assertEquals("FALHA_INTEGRACAO", event.getValue().eventType());
+        assertEquals("OPE-1", event.getValue().operationId());
+        assertTrue(event.getValue().message().contains("conta"));
     }
 
     @Test

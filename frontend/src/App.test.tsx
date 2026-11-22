@@ -373,6 +373,55 @@ describe('App', () => {
     expect(await screen.findByText(/motivo da rejeição: convênio bloqueado/i)).toBeTruthy();
   });
 
+  it('must show the integration failure message and keep the operation pending when the status consultation fails', async () => {
+    mockedApiFetch.mockImplementation(async (path) => {
+      if (path === '/authorizations') return authorization as never;
+      if (path === '/portability') return operation as never;
+      if (path === '/portability/OPE-1') throw new Error('Central indisponível');
+      return [] as never;
+    });
+    render(<App />);
+
+    await authorize();
+    fillOperationForm();
+    fireEvent.click(screen.getByRole('button', { name: /registrar portabilidade/i }));
+    await screen.findByText('PRT-1');
+    fireEvent.click(screen.getByRole('button', { name: /consultar status/i }));
+
+    const alert = await screen.findByRole('alert');
+    expect(alert.textContent).toContain('Central indisponível');
+    expect(screen.getByText('PENDING')).toBeTruthy();
+  });
+
+  it('must display the integration failure event in the audit trail', async () => {
+    const events: AuditEvent[] = [
+      {
+        eventId: 'EVT-F07',
+        operationId: 'OPE-1',
+        eventType: 'FALHA_INTEGRACAO',
+        message: 'Falha ao consultar status na Central: Central indisponível',
+        occurredAt: '2026-11-22T12:35:56Z',
+      },
+    ];
+    mockedApiFetch.mockImplementation(async (path) => {
+      if (path === '/authorizations') return authorization as never;
+      if (path === '/portability') return operation as never;
+      if (path.endsWith('/audit')) return events as never;
+      return operation as never;
+    });
+    render(<App />);
+
+    await authorize();
+    fillOperationForm();
+    fireEvent.click(screen.getByRole('button', { name: /registrar portabilidade/i }));
+    await screen.findByText('PRT-1');
+    await waitForAuditOperationId('OPE-1');
+    fireEvent.click(screen.getByRole('button', { name: /consultar auditoria/i }));
+
+    expect(await screen.findByText('FALHA_INTEGRACAO')).toBeTruthy();
+    expect(screen.getByText(/falha ao consultar status na central: central indisponível/i)).toBeTruthy();
+  });
+
   it('should display an empty state when the audit has no events', async () => {
     mockedApiFetch.mockImplementation(async (path) => {
       if (path === '/authorizations') return authorization as never;

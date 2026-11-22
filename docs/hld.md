@@ -86,16 +86,30 @@ sequenceDiagram
     end
     F->>A: GET /api/portability/{operationId}
     A->>C: GET /central/operacoes-portabilidade/{protocol} (Retry-After)
-    C-->>A: 204 pendente (2x) ou 200 com status final
-    A->>A: atualiza status e anexa evento quando há transição
-    A-->>F: 200 com a operação (ainda PENDING se não confirmou)
+    alt confirmada
+        C-->>A: 200 CONFIRMADA
+        A->>A: atualiza status e anexa evento CONFIRMADA
+        A-->>F: 200 com a operação confirmada
+    else pendente
+        C-->>A: 204 com Retry-After
+        A->>A: aguarda o backoff e tenta de novo (até 3 vezes)
+        A-->>F: 200 com a operação ainda PENDING
+    else rejeitada
+        C-->>A: 200 REJEITADA com motivo
+        A->>A: grava REJECTED e anexa evento REJEITADA
+        A-->>F: 200 com status e motivo da rejeição
+    else falha de integração
+        C-->>A: 503 ou timeout
+        A->>A: anexa evento FALHA_INTEGRACAO sem alterar o status
+        A-->>F: 502 com mensagem de erro
+    end
     Note over F,A: F05: com a operação CONFIRMED, o operador corrige a conta de recebimento
     F->>A: PUT /api/portability/{operationId}/receiving-account
     A->>C: PUT /central/operacoes-portabilidade/{protocol} (HMAC)
     C-->>A: 200 com a conta aceita
     A->>A: atualiza conta local e anexa evento CONTA_ATUALIZADA
     A-->>F: 200 com a operação atualizada
-    Note over A,C: F07 trata rejeições e falhas da Central
+    Note over C: F07: o mock escolhe o desfecho por marcador no credor (detalhes no LLD)
 ```
 
 ## Fluxo 3 — trilha de auditoria

@@ -114,10 +114,13 @@ A tradução acontece em `adapters/out/central`:
   `PENDING`. A espera antes da tentativa `n` é `min(5s, max(Retry-After, 1s × 2^(n-1)))`; `BackoffPort`
   aplica a espera e a política fica no caso de uso. Esgotadas as tentativas, a operação permanece
   `PENDING` e o `GET` responde `200` sem evento novo.
-- Mock de status: as duas primeiras consultas a um protocolo respondem `204` com `Retry-After: 1`; a
-  terceira responde `CONFIRMADA`. O contador é em memória e por protocolo; protocolo desconhecido responde
-  `404`. A transição final usa `updateStatus` e anexa um evento `CONFIRMADA` ou `REJEITADA` com o protocolo
-  e, quando houver, o motivo. Operação já finalizada não consulta a Central.
+- Mock de status: o desfecho é escolhido no registro pelo valor de `credorCessionario` (case-insensitive) e
+  guardado por protocolo em mapa em memória. Sem marcador ou com `REJEITAR`, as duas primeiras consultas
+  respondem `204` com `Retry-After: 1`; a partir da terceira, `CONFIRMADA` ou `REJEITADA` com motivo,
+  respectivamente. Com `FALHA`, toda consulta responde `503` sem corpo, sem contador e sem transição.
+  `REJEITAR` prevalece se ambos os marcadores aparecerem. Protocolo desconhecido responde `404`. A transição
+  final usa `updateStatus` e anexa `CONFIRMADA` ou `REJEITADA` com o protocolo e, quando houver, o motivo.
+  Operação já finalizada não consulta a Central.
 - A Central valida as duas assinaturas: `201` com `autorizacaoId` no opt-in e `202` com `protocolo` no
   registro; `400` para payload inválido e `401` para assinatura ausente/inválida. O protocolo do mock é
   determinístico por payload. Na API, falha de integração vira `502`.
@@ -129,8 +132,11 @@ A tradução acontece em `adapters/out/central`:
   beneficiário (`403`), reconsulta a agenda e só aceita parcelas existentes, `OPEN` e com data futura,
   sem duplicatas. A criação persiste a operação `PENDING` e anexa um evento `SOLICITADA` com o protocolo;
   falha da Central não grava operação nem evento.
-- Erros: falha de integração, timeout e resposta inesperada são traduzidos pelo adapter REST em respostas
-  HTTP claras, exibidas no frontend. Eventos de falha de integração são F07.
+- Erros: falha de integração, timeout e resposta inesperada são traduzidos pelo adapter REST em `502` com
+  `{ "message": "..." }`, exibida no frontend. Quando a operação já existe, a aplicação anexa
+  `FALHA_INTEGRACAO` com o ID da operação e o contexto da chamada ao redor de `consultStatus` e
+  `updateReceivingAccount`, propaga a exceção e não altera status, motivo nem conta. Falhas no opt-in, na
+  agenda ou no registro não geram evento órfão.
 - Transições de `OperationStatus` (`CONFIRMED`/`REJECTED`) e seus eventos são F04. A conta de recebimento
   pode ser corrigida somente em operações `CONFIRMED` (F05): a aplicação envia `PUT` assinado à Central com
   `protocolo`, `banco`, `agencia` e `conta`, persiste a nova conta e anexa `CONTA_ATUALIZADA` somente quando

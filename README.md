@@ -183,7 +183,11 @@ Ver [`AGENTS.md`](AGENTS.md), seção "Agentes e skills".
 `Retry-After` com backoff (política em [`docs/lld.md`](docs/lld.md), seção "Integração, idempotência e
 erros"). A resposta é sempre a operação com o status mais recente; se a confirmação não chegar dentro das
 tentativas, o status continua `PENDING` e uma nova consulta retoma o acompanhamento. Operação já
-`CONFIRMED` ou `REJECTED` não consulta a Central.
+`CONFIRMED` ou `REJECTED` não consulta a Central. Quando a Central rejeita, o status passa a `REJECTED` com
+`rejectionReason` e a trilha recebe um evento `REJEITADA`. Quando a integração falha (indisponibilidade,
+timeout ou resposta inesperada), a resposta é `502` com `{ "message": "..." }`, o estado da operação não muda
+e, se já existir operação, a trilha recebe um evento `FALHA_INTEGRACAO`. Falhas no opt-in, na agenda ou no
+registro não geram evento, pois ainda não há operação.
 
 `PUT /api/portability/{operationId}/receiving-account` aceita `{ "bank", "agency", "account" }` somente para
 operações `CONFIRMED` (`409` caso contrário). A conta é enviada assinada à Central pelo protocolo, a operação
@@ -203,7 +207,7 @@ grava eventos.
 | `POST` | `/central/autorizacoes` | `201`, `400`, `401` | Registrar autorização; `201` devolve `{ "autorizacaoId": "..." }` |
 | `GET` | `/central/beneficiarios/{beneficiaryId}/agenda` | `200` | Listar parcelas (fixture fixa por beneficiário) |
 | `POST` | `/central/operacoes-portabilidade` | `202`, `400`, `401` | Registrar operação; `202` devolve `{ "protocolo": "..." }` |
-| `GET` | `/central/operacoes-portabilidade/{protocol}` | `204` + `Retry-After`, `200`, `404` | Consultar status da operação (mock: pendente nas duas primeiras consultas) |
+| `GET` | `/central/operacoes-portabilidade/{protocol}` | `204` + `Retry-After`, `200`, `404`, `503` | Consultar status da operação (desfecho escolhido por marcador no credor) |
 | `PUT` | `/central/operacoes-portabilidade/{protocol}/conta-recebimento` | `200`, `400`, `401`, `404` | Atualizar a conta de recebimento (assinado) |
 
 `POST /central/autorizacoes` exige o cabeçalho `X-Signature`: HMAC-SHA256 em Base64 do corpo exato da
@@ -215,9 +219,19 @@ responde `401`; payload com campos em branco responde `400`.
 é `PRT-` seguido de um UUID determinístico derivado do corpo canônico, portanto o mesmo payload devolve o
 mesmo protocolo. Assinatura ausente/inválida responde `401` e payload inválido responde `400`.
 
-`GET /central/operacoes-portabilidade/{protocolo}` não exige assinatura nem corpo. No mock, as duas
-primeiras consultas a um protocolo respondem `204` com `Retry-After: 1`; a partir da terceira, respondem
-`200` com `CONFIRMADA`. Protocolo desconhecido responde `404`.
+`GET /central/operacoes-portabilidade/{protocolo}` não exige assinatura nem corpo. O desfecho é escolhido no
+registro pelo valor de `credorCessionario` (comparação sem diferenciar maiúsculas/minúsculas) e guardado por
+protocolo:
+
+| Marcador no credor | Consultas de status |
+| --- | --- |
+| `REJEITAR` | duas `204` com `Retry-After: 1`, depois `200` com `{ "status": "REJEITADA", "motivoRejeicao": "Convênio de origem não autoriza a portabilidade" }` |
+| `FALHA` | `503` sem corpo em toda consulta |
+| nenhum | duas `204` com `Retry-After: 1`, depois `200` com `CONFIRMADA` |
+
+Se os dois marcadores aparecerem juntos, `REJEITAR` prevalece. O registro sempre devolve `202` com
+protocolo; a falha ocorre no acompanhamento, quando já existe operação local. Protocolo desconhecido responde
+`404`.
 
 `PUT /central/operacoes-portabilidade/{protocolo}/conta-recebimento` usa o mesmo esquema de assinatura do
 registro: corpo canônico em pt-BR sem `assinatura`, HMAC enviado no cabeçalho `X-Signature` e no próprio

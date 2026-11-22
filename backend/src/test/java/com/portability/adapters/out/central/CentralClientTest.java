@@ -252,6 +252,14 @@ class CentralClientTest {
     }
 
     @Test
+    void shouldTranslateServiceUnavailableDuringStatusConsultationIntoCentralUnavailableException() {
+        statusCode = 503;
+        statusBody = "";
+
+        assertThrows(CentralUnavailableException.class, () -> client.consultStatus("PRT-1"));
+    }
+
+    @Test
     void shouldFailWhenCentralStatusIsUnknown() {
         statusCode = 200;
         statusBody = "{\"status\":\"DESCONHECIDO\",\"motivoRejeicao\":null}";
