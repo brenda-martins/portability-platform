@@ -34,7 +34,7 @@ docs/funcionalidades/<NN>-<titulo>/
 ## Regras
 
 - O `prd.md` aponta para `docs/product-brief.md` em vez de repetir métricas e requisitos do produto.
-- A `spec.md` segue `docs/hld.md`, `docs/lld.md` e o README (decisões técnicas), apontando para eles.
+- A `spec.md` segue `docs/hld.md`, `docs/lld.md` e o README, apontando para eles.
 - Antes do código, cada tarefa ganha um `plano.md`, aprovado e commitado **sozinho** no commit de plano.
   Depois disso o plano fica congelado: só o usuário o descongela. Decisões que se mostrarem erradas são
   corrigidas na spec, no LLD ou numa tarefa nova — nunca reescrevendo o plano aprovado.

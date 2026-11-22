@@ -1,13 +1,13 @@
 # backend
 
-Java 21 + Spring Boot 4.2.0 + Maven + PostgreSQL (H2 nos testes), arquitetura hexagonal. **Estado
-atual:** casos de uso e adapters são stubs; o panorama completo está em [`../README.md`](../README.md).
+Java 21 + Spring Boot 4.2.0 + Maven + PostgreSQL (H2 nos testes), arquitetura hexagonal. Visão geral:
+[`../README.md`](../README.md).
 
 ## Documentos
 
 A lista de documentos e o dono de cada informação estão em [`../AGENTS.md`](../AGENTS.md), seções
 "Documentos" e "Onde cada informação mora". Comandos e práticas deste projeto:
-[`AGENTS.md`](AGENTS.md). Execução detalhada, contratos, modelo de dados, decisões e limitações:
+[`AGENTS.md`](AGENTS.md). Execução, contratos, modelo de dados e versões:
 [`../README.md`](../README.md).
 
 ---

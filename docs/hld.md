@@ -1,7 +1,8 @@
 # HLD — High-level design
 
-> **Dono:** visão geral do sistema, responsabilidades por camada e fluxos principais. Decisões técnicas
-> ficam no README, seção "Decisões técnicas"; detalhes de implementação em [`lld.md`](lld.md);
+> **Dono:** visão geral do sistema, responsabilidades por camada e fluxos principais. Versões das
+> tecnologias e contratos HTTP ficam no README, seções "Tecnologias" e "Documentação da API";
+> detalhes de implementação em [`lld.md`](lld.md);
 > convenções de código no [`../AGENTS.md`](../AGENTS.md); termos em [`../GLOSSARY.md`](../GLOSSARY.md).
 > Quando uma tarefa alterar algo registrado aqui, carregue a skill `hld` (se disponível) em modo
 > atualizar antes de editar este arquivo.
@@ -85,9 +86,9 @@ sequenceDiagram
     A-->>F: status final e trilha
 ```
 
-## Decisões e evoluções
+## Documentos relacionados
 
-- Decisões já tomadas e seus trade-offs: README, seção "Decisões técnicas".
+- Versões das tecnologias: README, seção "Tecnologias".
 - Contratos HTTP: README, seção "Documentação da API".
 - Sequência detalhada, mapeamentos e estruturas internas: [`lld.md`](lld.md).
-- Evoluções previstas: README, seção "Próximos passos"; status em [`roadmap.md`](roadmap.md).
+- Funcionalidades e status: [`roadmap.md`](roadmap.md).

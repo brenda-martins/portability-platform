@@ -4,12 +4,6 @@
 > Leia este documento **antes** de qualquer tarefa de design ou interface. Termos em
 > [`../GLOSSARY.md`](../GLOSSARY.md); estrutura do frontend no [`../frontend/AGENTS.md`](../frontend/AGENTS.md).
 
-## Situação atual
-
-Interface simplificada: uma única tela, CSS puro, sem biblioteca de componentes e sem Figma. Os quatro
-painéis estão implementados em `frontend/src/features/` e estilizados em `frontend/src/index.css`.
-Falhas da API são exibidas no painel afetado; não há "sucesso falso".
-
 ## Tokens
 
 Tokens como custom properties em `:root`, em `frontend/src/index.css`:
@@ -32,20 +26,20 @@ Tokens como custom properties em `:root`, em `frontend/src/index.css`:
 
 ## Componentes
 
-| Componente | Classe | Estado | Uso |
-| --- | --- | --- | --- |
-| Container da aplicação | `.app` | Implementado | Limita a largura a `900px` e centraliza o conteúdo |
-| Cabeçalho | `.app-header` | Implementado | Título e descrição do produto |
-| Grade principal | `.app-main` | Implementado | Empilha os quatro painéis com gap de `1rem` |
-| Painel | `.panel` | Implementado | Uma etapa do fluxo; fundo claro, borda e raio |
-| Campo de formulário | `.field` | Implementado | `label` associado ao `input` |
-| Botão | `.button` | Implementado | Ações com `type` explícito e `disabled` real |
-| Ações do formulário | `.form-actions` | Implementado | Alinha botões e texto de carregamento |
-| Dica / estado vazio | `.hint` | Implementado | Texto secundário, carregamento e listas vazias |
-| Tabela de parcelas | `.installments` | Implementado | Seleção de parcelas elegíveis |
-| Badge de status | `.status` / `.status--rejected` | Implementado | Status da operação e confirmação de autorização |
-| Alerta | `.alert` | Implementado | Rejeição e falhas de API, com `role="alert"` |
-| Lista de eventos | `.event-list` / `.event-type` | Implementado | Trilha de auditoria ordenada por data |
+| Componente | Classe | Uso |
+| --- | --- | --- |
+| Container da aplicação | `.app` | Limita a largura a `900px` e centraliza o conteúdo |
+| Cabeçalho | `.app-header` | Título e descrição do produto |
+| Grade principal | `.app-main` | Empilha os quatro painéis com gap de `1rem` |
+| Painel | `.panel` | Uma etapa do fluxo; fundo claro, borda e raio |
+| Campo de formulário | `.field` | `label` associado ao `input` |
+| Botão | `.button` | Ações com `type` explícito e `disabled` real |
+| Ações do formulário | `.form-actions` | Alinha botões e texto de carregamento |
+| Dica / estado vazio | `.hint` | Texto secundário, carregamento e listas vazias |
+| Tabela de parcelas | `.installments` | Seleção de parcelas elegíveis |
+| Badge de status | `.status` / `.status--rejected` | Status da operação e confirmação de autorização |
+| Alerta | `.alert` | Rejeição e falhas de API, com `role="alert"` |
+| Lista de eventos | `.event-list` / `.event-type` | Trilha de auditoria ordenada por data |
 
 ## Estados de interação
 
@@ -60,13 +54,12 @@ Tokens como custom properties em `:root`, em `frontend/src/index.css`:
 ## Responsividade
 
 - Layout: largura máxima de `900px`, padding `2rem 1rem 4rem`, grade com `gap: 1rem`.
-- Em telas estreitas, manter o padding lateral de `1rem` e empilhar os painéis (comportamento já
-  obtido pela grade).
+- Em telas estreitas, manter o padding lateral de `1rem` e empilhar os painéis pela grade.
 - Abaixo de `600px`, a tabela de parcelas rola horizontalmente.
 
 ## Fluxo de trabalho com Figma
 
-Não há arquivo do Figma nesta etapa. Se o projeto adotar Figma:
+Se houver arquivo do Figma:
 
 1. Registre o link do arquivo nesta seção.
 2. Mantenha tokens do Figma e do CSS sincronizados; qualquer mudança de token atualiza este documento.

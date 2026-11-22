@@ -15,7 +15,7 @@ Em `docs/` ficam os documentos que definem o produto, a arquitetura e os detalhe
 5. `docs/roadmap.md`: funcionalidades, dependências e status.
 6. `GLOSSARY.md`, na raiz: vocabulário do domínio. Use esses termos nos documentos e no planejamento.
 7. `docs/funcionalidades/`: PRD, spec, tarefas e planos (estrutura em `docs/funcionalidades/README.md`).
-8. `README.md`, na raiz: execução, contratos, modelo de dados, decisões técnicas e limitações.
+8. `README.md`, na raiz: execução, contratos, modelo de dados e versões das tecnologias.
 9. PDF do desafio (spec imutável) e Apêndice A deste arquivo (registro do uso de IA).
 
 Cada projeto tem o próprio `AGENTS.md`, com os comandos, as particularidades da stack e as práticas de
@@ -35,7 +35,7 @@ código dele:
 | Lista e status das funcionalidades | `docs/roadmap.md` |
 | Vocabulário do domínio | `GLOSSARY.md` |
 | PRD, spec, tarefas e planos | `docs/funcionalidades/<NN>-<titulo>/` |
-| Execução, API, esquema, decisões técnicas, limitações | `README.md` |
+| Execução, API, esquema e versões das tecnologias | `README.md` |
 | Convenções, regras de negócio, restrições e processo para agentes | este `AGENTS.md` |
 | Comandos e práticas específicas | `backend/AGENTS.md`, `frontend/AGENTS.md` |
 | Histórico do uso de IA | Apêndice A deste arquivo |
@@ -43,6 +43,9 @@ código dele:
 - **Nunca nos dois.** Uma informação tem um dono só; os outros arquivos apontam para ele pelo nome do
   documento e da seção, sem repetir o conteúdo. Resumos são permitidos apenas quando necessários para
   compreensão, e devem indicar o dono.
+- **Documentar funcionalidades e contratos.** PRD, spec, design system e roadmap descrevem o que o
+  sistema faz; README registra execução, API, modelo de dados e versões. Não registre histórico de
+  ajustes técnicos, decisões tomadas durante a implementação nem exceções de planejamento.
 - **HLD e LLD mudam pela skill deles.** Quando uma tarefa altera algo que `docs/hld.md` ou `docs/lld.md`
   registra, carregue a skill `hld` ou `lld` (se disponível) e use o modo atualizar antes de editar.
 - Informações que deveriam estar em arquivos de memória (este `AGENTS.md` e os `AGENTS.md` de projeto)
@@ -56,10 +59,8 @@ beneficiário, consultar sua agenda de descontos futuros na Central de Convênio
 acompanhar a confirmação assíncrona e exibir a trilha de auditoria. O detalhamento está em
 `docs/product-brief.md`.
 
-**Estado atual:** estrutura inicial (scaffold).
-
 > Não apresente stubs como funcionalidade pronta. Ao implementar algo, remova o stub correspondente e
-> atualize o status em `docs/roadmap.md` e no README.
+> atualize o status em `docs/roadmap.md`.
 
 ## Especificações e ordem de precedência
 
@@ -70,11 +71,11 @@ uma ambiguidade silenciosamente.
 2. **Documentos de produto e arquitetura:** `docs/product-brief.md`, `docs/hld.md`, `docs/lld.md`,
    `docs/design-system.md`, `docs/roadmap.md` e `GLOSSARY.md`.
 3. **Este `AGENTS.md`** e os `AGENTS.md` de projeto: convenções, restrições e processo.
-4. **`README.md`:** estado atual, contratos expostos, decisões e limitações.
+4. **`README.md`:** execução, contratos expostos e modelo de dados.
 
 ## Stack tecnológica
 
-Versões, justificativas e regras para novas dependências: README, seção "Tecnologias".
+Versões: README, seção "Tecnologias". Como executar: README, seção "Execução".
 
 ## Arquitetura definida
 
@@ -213,13 +214,13 @@ O status da funcionalidade mora no roadmap; o da tarefa, no campo `Status` do `t
 
 ## Regras de documentação
 
-- `README.md` é a porta de entrada pública e o dono de execução, API, esquema, decisões e limitações.
-  Atualize-o no mesmo commit da mudança de código.
+- `README.md` é a porta de entrada pública e o dono de execução, API, esquema e versões das tecnologias.
+  Atualize-o somente quando um desses conteúdos mudar — não para registrar cada alteração de código.
 - `docs/` é o dono de produto, arquitetura, design e roadmap; `AGENTS.md` e os `AGENTS.md` de projeto são
   a memória de regras e comandos. **Uma informação tem um dono só**; os demais arquivos apontam para ele
   pelo nome do documento e da seção, sem repetir o conteúdo.
-- Decisões técnicas devem ser registradas no README com contexto, escolha, motivo e trade-off; decisões
-  futuras substituem as antigas sem apagar o histórico (use data e estado "superada", quando aplicável).
+- A documentação descreve funcionalidades e contratos. Não escreva registros de mudanças, justificativas
+  de decisões pontuais nem notas sobre exceções de planejamento.
 - Documentação em pt-BR; nomes de código, endpoints e variáveis em inglês (ou em pt-BR quando o contrato
   da Central exigir). Diagramas em Mermaid, versionáveis e revisáveis como texto.
 - Não documente código morto como se estivesse ativo. Se um endpoint é placeholder, diga explicitamente.
@@ -233,8 +234,8 @@ O status da funcionalidade mora no roadmap; o da tarefa, no campo `Status` do `t
 - Domínio livre de frameworks; dependências sempre apontando para o domínio.
 - Controllers não acessam repositórios; componentes React não acessam API diretamente.
 - Entidades JPA não vazam para o domínio nem para respostas HTTP; conversão explícita nos adapters.
-- Nenhuma dependência nova sem justificativa escrita (motivo, alternativa descartada, impacto) e sem
-  registro na seção "Tecnologias" do README.
+- Nenhuma dependência nova sem justificativa na spec da funcionalidade; o README registra apenas a
+  versão na seção "Tecnologias".
 - Sem router, estado global, UI kit ou ORM alternativo sem aprovação explícita — o pedido foi "frontend
   de forma simplificada".
 - PostgreSQL é o padrão da aplicação (`compose.yaml` na raiz); H2 fica apenas nos testes. Os dados do
@@ -249,7 +250,7 @@ Nenhuma implementação começa sem spec. O fluxo é **sequencial**; não pule e
 1. **Consultar** o PDF, os requisitos do usuário, `docs/`, este arquivo, os `AGENTS.md` de projeto e o
    README.
 2. **Localizar ou escrever a spec da tarefa:** PRD → spec → tarefa → plano, conforme "Planejamento".
-   Registre comportamento observável, critérios de aceite, contratos afetados, decisões e trade-offs.
+   Registre comportamento observável, critérios de aceite e contratos afetados.
    Se algo estiver ambíguo, pergunte e registre a resposta.
 3. **Desenhar contratos antes do código:** ports, assinaturas, DTOs, eventos e tabelas. Se houver
    mudança de contrato, atualize README e `docs/lld.md` nesta etapa.
@@ -259,12 +260,13 @@ Nenhuma implementação começa sem spec. O fluxo é **sequencial**; não pule e
    TODOs explícitos.
 6. **Refatorar (refactor):** simplificar sem alterar comportamento; rodar os testes novamente.
 7. **Verificar:** executar a Verificação completa de todos os projetos tocados.
-8. **Documentar e reportar:** atualizar README, `docs/` (roadmap e documentos tocados), `AGENTS.md`
-   quando aplicável e o Apêndice A. Relate mudanças, testes executados, riscos e próximos passos.
+8. **Documentar e reportar:** atualizar apenas o que descreve funcionalidades e contratos — roadmap,
+   PRD/spec e README quando houver mudança de execução, API ou esquema. Relate mudanças, testes
+   executados, riscos e próximos passos na resposta, não em arquivos de registro de alterações.
 
 **Gates:** se a spec mudar durante a implementação, volte à etapa 2; mude o plano somente com a
-autorização do usuário, registrando a decisão na spec/LLD. Se a solicitação estiver fora do escopo,
-registre-a no roadmap e pare. Se um teste não puder ser escrito, explique o motivo antes de implementar.
+autorização do usuário. Se a solicitação estiver fora do escopo, registre-a no roadmap e pare. Se um
+teste não puder ser escrito, explique o motivo antes de implementar.
 
 ## Convenções de Git
 
@@ -298,12 +300,12 @@ prevalece.
 
 1. **Sempre consultar as especificações antes de implementar.** PDF, requisitos do usuário, `docs/`,
    `AGENTS.md` e README, nessa ordem de precedência.
-2. **Não implementar funcionalidades fora do escopo.** O estado atual é scaffold; regras de negócio só
-   entram quando explicitamente solicitadas e planejadas.
+2. **Não implementar funcionalidades fora do escopo.** Regras de negócio só entram quando
+   explicitamente solicitadas e planejadas.
 3. **Não alterar contratos sem atualizar as especificações.** Endpoints, DTOs, ports, schema e status
    HTTP mudam junto com README, `docs/lld.md`, testes e plano/spec da tarefa.
-4. **Não adicionar dependências sem justificativa.** Registre motivo, alternativas e impacto; prefira
-   o que já está no stack.
+4. **Não adicionar dependências sem justificativa.** Prefira o que já está no stack; o README registra
+   apenas a versão.
 5. **Não duplicar responsabilidades.** Um port por caso de uso, um dono por regra, uma fonte de verdade
    por informação.
 6. **Não ignorar validações e tratamento de erros.** Inclusive falhas parciais, timeouts e respostas
@@ -311,8 +313,8 @@ prevalece.
 7. **Criar testes para as funcionalidades implementadas.** Sem teste, a funcionalidade não está pronta.
 8. **Executar testes antes de considerar uma tarefa concluída.** Backend e frontend, com os comandos
    oficiais.
-9. **Atualizar documentação quando necessário.** Cada informação no arquivo dono, com ponteiros nos
-   demais.
+9. **Atualizar documentação quando necessário.** Só funcionalidades e contratos, no arquivo dono, com
+   ponteiros nos demais; não registre cada modificação técnica.
 10. **Manter o código simples, legível e sustentável.** Soluções pequenas e óbvias vencem soluções
     clever; complexidade precisa de justificativa escrita.
 

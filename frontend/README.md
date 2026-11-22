@@ -1,15 +1,13 @@
 # frontend
 
 React 19 + TypeScript 5.9 + Vite 6, interface simplificada de tela única, sem router e sem biblioteca de
-estado. **Estado atual:** os quatro painéis estão implementados e ligados aos endpoints atuais (que
-ainda retornam `404`); o panorama completo está em [`../README.md`](../README.md).
+estado. Visão geral: [`../README.md`](../README.md).
 
 ## Documentos
 
 A lista de documentos e o dono de cada informação estão em [`../AGENTS.md`](../AGENTS.md), seções
 "Documentos" e "Onde cada informação mora". Comandos e práticas deste projeto:
-[`AGENTS.md`](AGENTS.md). Execução detalhada, contrato `/api`, decisões e limitações:
-[`../README.md`](../README.md).
+[`AGENTS.md`](AGENTS.md). Execução, contrato `/api` e versões: [`../README.md`](../README.md).
 
 ---
 

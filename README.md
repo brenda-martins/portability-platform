@@ -5,11 +5,7 @@ a ser a nova credora de parcelas hoje devidas a outro credor. A integração com
 simulada cobre `opt-in`, agenda de descontos, registro da operação, confirmação assíncrona e trilha de
 auditoria.
 
-> **Estado atual:** estrutura concluída, com a interface dos quatro fluxos ligada aos endpoints atuais e
-> PostgreSQL local via Docker Compose; **nenhuma regra de negócio está implementada no backend**. Casos
-> de uso e adapters lançam `UnsupportedOperationException`, os endpoints de `/api` retornam `404` e os
-> da Central, `501`; apenas `GET /api/health` responde efetivamente. A UI exibe esses erros. Status por
-> funcionalidade: [`docs/roadmap.md`](docs/roadmap.md).
+Funcionalidades e status: [`docs/roadmap.md`](docs/roadmap.md).
 
 Regras para agentes de IA: [`AGENTS.md`](AGENTS.md).
 
@@ -25,28 +21,19 @@ projeto: [`backend/AGENTS.md`](backend/AGENTS.md) e [`frontend/AGENTS.md`](front
 
 ## Tecnologias
 
-Versões e justificativas das escolhas abaixo; novas dependências exigem justificativa e registro nesta
-seção.
-
-| Camada | Tecnologia | Versão | Justificativa |
-| --- | --- | --- | --- |
-| Linguagem / runtime | Java | 21 | Requisito do usuário; compatível com Spring Boot 4 |
-| Framework backend | Spring Boot (Web, Data JPA, Validation) | 4.2.0 | Requisito do usuário; ecossistema maduro para REST + JPA |
-| Build | Maven | 3.6.3+ | Exigido pelo Spring Boot 4; já disponível no ambiente |
-| Banco | PostgreSQL (Docker Compose) + H2 | 16-alpine / gerenciado pelo Boot | PostgreSQL é o padrão da aplicação; H2 fica só nos testes, sem exigir Docker para `mvn test` |
-| ORM | Hibernate / Spring Data JPA | gerenciado pelo Boot | Mapeamento dos ports de repositório com baixo código |
-| Frontend | React + TypeScript | 19 / 5.9 | Requisito do desafio; TS recomendado no PDF |
-| Build frontend | Vite + plugin-react | 6.4 / 4.7 | Dev server rápido e proxy `/api` nativo |
-| Testes backend | JUnit 5 + Spring Boot Test | gerenciado pelo Boot | Smoke test de contexto já incluído |
-| Testes frontend | Vitest + Testing Library + jsdom | 3.2 / 16.3 / 26.1 | Testes de comportamento da UI em ambiente DOM |
-| Estilos | CSS puro | — | Frontend simplificado; sem dependência de UI kit |
-| Documentação | Markdown + Mermaid | — | Diagramas versionáveis, renderizados pelo GitHub |
-| Spec | `pdftotext` (poppler) | opcional | Utilizado para ler o PDF do desafio |
-
-**Não incluído de propósito:** Lombok, Flyway/Liquibase, React Router, biblioteca de estado global,
-biblioteca de componentes e CI/CD. O Compose existe apenas para o PostgreSQL de desenvolvimento;
-backend e frontend não são containerizados. Qualquer inclusão futura exige justificativa em
-[Decisões técnicas](#decisões-técnicas).
+| Camada | Tecnologia | Versão |
+| --- | --- | --- |
+| Linguagem / runtime | Java | 21 |
+| Framework backend | Spring Boot (Web, Data JPA, Validation) | 4.2.0 |
+| Build | Maven | 3.6.3+ |
+| Banco | PostgreSQL (Docker Compose) + H2 | 16-alpine / gerenciado pelo Boot |
+| ORM | Hibernate / Spring Data JPA | gerenciado pelo Boot |
+| Frontend | React + TypeScript | 19 / 5.9 |
+| Build frontend | Vite + plugin-react | 6.4 / 4.7 |
+| Testes backend | JUnit 5 + Spring Boot Test | gerenciado pelo Boot |
+| Testes frontend | Vitest + Testing Library + jsdom | 3.2 / 16.3 / 26.1 |
+| Estilos | CSS puro | — |
+| Documentação | Markdown + Mermaid | — |
 
 ---
 
@@ -289,8 +276,7 @@ curl -X POST http://localhost:8080/api/authorizations \
 
 O Hibernate cria as tabelas no startup (`spring.jpa.hibernate.ddl-auto: update`) no PostgreSQL
 (`jdbc:postgresql://localhost:5433/portability`, via Compose). Nos testes, o perfil `test` usa H2 em
-memória com `ddl-auto: create-drop`. Ainda não há seed, índices ou constraints de unicidade —
-idempotência não foi implementada. Mapeamentos de domínio em
+memória com `ddl-auto: create-drop`. Mapeamentos de domínio em
 [`docs/lld.md`](docs/lld.md), seção "Persistência".
 
 ### `authorizations`
@@ -332,40 +318,6 @@ Eventos devem ser **append-only**: nunca atualizados nem apagados (regra a imple
 
 ---
 
-## Decisões técnicas
-
-| Decisão | Escolha | Motivo / trade-off |
-| --- | --- | --- |
-| Backend | Spring Boot 4.2.0 + Java 21 | Requisito do usuário; compatível com Spring Boot 4 |
-| Estrutura | Hexagonal (`domain` + `application` + `adapters/in` + `adapters/out`) | Isola regras de framework, REST e banco; custo de mais arquivos e mapeamentos |
-| Persistência | PostgreSQL local via Compose; H2 só nos testes | Banco externo verificável sem containerizar a app; testes rápidos e independentes de Docker; porta host `5433` evita colisão com instância local |
-| Central | Mock REST no próprio backend (`/central`) | Mantém apenas `backend/` e `frontend/` e um único comando de execução; acopla deploy da simulação ao da API |
-| Frontend | Vite 6 + React 19 + TypeScript 5.9, CSS puro, sem router | Pedido de "forma simplificada"; se o fluxo crescer, avaliar React Router e TanStack Query |
-| Idioma | Código/contrato `/api` em inglês; contrato da Central em pt-BR | Nomes de pastas em inglês pedidos pelo usuário; PDF usa pt-BR na Central |
-| Stubs | `UnsupportedOperationException` / `501` | Deixa explícito o que não existe, evitando dados falsos que pareçam prontos |
-| Testes | 1 smoke test por módulo | Valida o scaffold; cenários críticos entram junto com as regras de negócio |
-| Documentação | Um dono por informação; READMEs como porta de entrada com ponteiros | Evita conteúdo duplicado entre README, `docs/` e `AGENTS.md`; custo de mais links a manter |
-| Versionamento | Repositório Git existente; sem histórico reescrito | Criado após o scaffold; nenhuma decisão de remote/publicação tomada nesta etapa |
-
----
-
-## Limitações conhecidas
-
-- Nenhuma regra de negócio está implementada: use cases, repositórios, cliente da Central e assinatura
-  são stubs; os endpoints de negócio da API retornam `404` e os da Central, `501`.
-- A UI tem formulários, seleção de parcelas, status e auditoria, mas como os endpoints de negócio
-  retornam `404`, o fluxo não avança sem o backend: os erros são exibidos nos painéis.
-- O schema é gerado por `ddl-auto: update` (PostgreSQL) / `create-drop` (H2 nos testes); não há
-  migrações versionadas e os dados do Compose sobrevivem a restart do container.
-- Não há autenticação/autorização, nem validação real de entrada, nem `@ControllerAdvice` para erros.
-- Idempotência, HMAC efetivo, retry/backoff, timeouts e auditoria append-only ainda não existem.
-- A propriedade `central.mock.enabled` está declarada, mas ainda não é usada para ligar/desligar o mock.
-- Não há CI/CD, containerização do backend/frontend, seed de dados, paginação, versionamento de API
-  nem testes de contrato HTTP.
-- A central "real" é uma simulação local; o contrato do PDF é um ponto de partida, não uma spec fechada.
-- O repositório ainda não foi publicado (a entrega final do PDF pede um link público).
-
----
-
-> **Manutenção:** sempre que o projeto evoluir, atualize neste mesmo commit o que é deste README:
-> execução, API, modelo de dados, tecnologias, decisões e limitações.
+> **Manutenção:** atualize este README somente quando mudarem execução, contratos da API, modelo de
+> dados ou versões das tecnologias. Funcionalidades e status ficam em
+> [`docs/roadmap.md`](docs/roadmap.md).

@@ -39,10 +39,6 @@ Requisitos não funcionais do MVP: HMAC simplificado, idempotência no registro,
 consulta de status, tratamento explícito de indisponibilidade/timeout/resposta inesperada, eventos de
 auditoria append-only e testes dos cenários críticos.
 
-**Estado atual:** o MVP segue sem regra de negócio implementada nos seis fluxos; a interface já
-exercita autorização, agenda, registro, status e auditoria contra os endpoints atuais, que permanecem
-como stubs. O status por funcionalidade está em [`roadmap.md`](roadmap.md).
-
 ## Fora de escopo
 
 - Central de Convênios real, certificado digital ou assinatura criptográfica completa.
@@ -54,7 +50,7 @@ como stubs. O status por funcionalidade está em [`roadmap.md`](roadmap.md).
 
 ## Planos (fases do produto)
 
-1. **Scaffold (atual):** estrutura hexagonal, ports, DTOs, schema inicial, smoke tests e documentação.
+1. **Scaffold:** estrutura hexagonal, ports, DTOs, schema inicial, smoke tests e documentação.
 2. **Fluxo core:** autorização, agenda, seleção de parcelas e registro da operação com protocolo.
 3. **Robustez:** confirmação assíncrona com backoff, idempotência, HMAC, auditoria e tratamento de erros.
 4. **Entrega:** interface conectada, cenários críticos cobertos, README final e publicação do repositório.
