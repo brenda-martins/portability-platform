@@ -5,7 +5,10 @@ a ser a nova credora de parcelas hoje devidas a outro credor. A integração com
 simulada cobre `opt-in`, agenda de descontos, registro da operação, confirmação assíncrona e trilha de
 auditoria.
 
-> **Estado atual:** estrutura inicial (scaffold) concluída.
+> **Estado atual:** estrutura inicial (scaffold) concluída. Camadas, ports, DTOs, entidades JPA e
+> placeholders de UI prontos; **nenhuma regra de negócio está implementada**. Casos de uso e adapters
+> lançam `UnsupportedOperationException`, os endpoints da Central retornam `501` e apenas
+> `GET /api/health` responde efetivamente. Status por funcionalidade:
 > [`docs/roadmap.md`](docs/roadmap.md).
 
 Regras para agentes de IA: [`AGENTS.md`](AGENTS.md).
