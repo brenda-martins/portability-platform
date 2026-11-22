@@ -15,6 +15,7 @@ Records imutáveis em `domain/model`, todos sem anotações de framework:
 | `Beneficiary` | `beneficiaryId`, `name` |
 | `Authorization` | `authorizationId`, `beneficiaryId`, `agreementId`, `createdAt` |
 | `AuthorizationResult` | `authorization`, `created` |
+| `PortabilityOperationResult` | `operation`, `created` |
 | `DiscountInstallment` | `installmentId`, `agreementId`, `amount` (`BigDecimal`), `discountDate` (`LocalDate`), `status` |
 | `ReceivingAccount` | `bank`, `agency`, `account` |
 | `PortabilityOperation` | `operationId`, `beneficiaryId`, `installmentIds`, `creditorAssignee`, `receivingAccount`, `status`, `protocol`, `rejectionReason`, `requestedAt` |
@@ -34,7 +35,7 @@ Enums: `OperationStatus` (`PENDING`, `CONFIRMED`, `REJECTED`), `InstallmentStatu
 | --- | --- |
 | `RegisterAuthorizationUseCase` | `registerAuthorization(beneficiaryId, agreementId): AuthorizationResult` |
 | `GetDiscountAgendaUseCase` | `getAgenda(beneficiaryId): List<DiscountInstallment>` |
-| `StartPortabilityUseCase` | `startPortability(beneficiaryId, installmentIds, creditorAssignee, receivingAccount): PortabilityOperation` |
+| `StartPortabilityUseCase` | `startPortability(beneficiaryId, installmentIds, creditorAssignee, receivingAccount): PortabilityOperationResult` |
 | `GetOperationStatusUseCase` | `getOperationStatus(operationId): Optional<PortabilityOperation>` |
 | `GetOperationAuditUseCase` | `getAuditTrail(operationId): List<AuditEvent>` |
 
@@ -44,10 +45,10 @@ Enums: `OperationStatus` (`PENDING`, `CONFIRMED`, `REJECTED`), `InstallmentStatu
 | --- | --- | --- |
 | `AuthorizationRepository` | `AuthorizationRepositoryAdapter` | salvar/buscar autorização por beneficiário e convênio; verificar existência por beneficiário |
 | `CentralAuthorizationPort` | `CentralClient` | montar payload/HMAC, registrar o opt-in na Central e devolver o `autorizacaoId` |
-| `OperationRepository` | `OperationRepositoryAdapter` | salvar/buscar operação por id e por protocolo (idempotência) |
-| `AuditEventRepository` | `AuditEventRepositoryAdapter` | anexar eventos e listar por operação |
-| `DiscountAgendaPort` | `CentralClient` | buscar agenda na Central |
-| `CentralPortabilityPort` | `CentralClient` | registrar operação e consultar status por protocolo |
+| `OperationRepository` | `OperationRepositoryAdapter` | salvar operação e buscar por chave de idempotência; busca por id/protocolo é F04 |
+| `AuditEventRepository` | `AuditEventRepositoryAdapter` | anexar eventos; listagem por operação é F06 |
+| `DiscountAgendaPort` | `CentralClient` | buscar agenda na Central (usada também para validar a seleção) |
+| `CentralPortabilityPort` | `CentralClient` | registrar operação assinada; consulta de status é F04 |
 | `SignaturePort` | `HmacSignatureService` | assinar e verificar mensagens |
 
 `PortabilityApplicationService` implementa os cinco ports de entrada e depende apenas dos ports de saída.
@@ -76,9 +77,10 @@ A tradução acontece em `adapters/out/central`:
 
 - Entidades JPA em `adapters/out/persistence` são **espelho** do domínio; nunca vazam para ports ou
   respostas HTTP.
-- `OperationJpaEntity` usa `@ElementCollection` para `installmentIds` (tabela `operation_installments`).
-- `AuditEventRepositoryAdapter.append` deve ser **append-only**: insert sem update/delete.
-- `findByProtocol` existe para suportar idempotência (F03).
+- `OperationJpaEntity` usa `@ElementCollection` para `installmentIds` (tabela `operation_installments`) e
+  `idempotency_key` única para reconhecer reenvios.
+- `AuditEventRepositoryAdapter.append` é **append-only**: insert sem update/delete.
+- `findById`/`findByProtocol` e a listagem de eventos permanecem stubs (F04/F06).
 - O datasource padrão usa PostgreSQL (`jdbc:postgresql://localhost:5433/portability`) com
   `ddl-auto: update`; o serviço é subido por `compose.yaml` na raiz.
 - O perfil `test` usa H2 em memória com `ddl-auto: create-drop`.
@@ -95,17 +97,25 @@ A tradução acontece em `adapters/out/central`:
   de elegibilidade; status HTTP diferente de `200`, corpo ausente/inválido, data fora de `AAAA-MM-DD` ou
   status desconhecido viram `CentralUnavailableException` (`502`). O `GET` da agenda não envia corpo nem
   assinatura, e a fixture da Central é fixa por beneficiário.
-- `CentralClient`: chamadas HTTP com timeout, assinatura HMAC enviada no header `X-Signature` sobre o
-  corpo exato e leitura de `Retry-After`; protocolo `202` e consulta de status com backoff.
-- A Central valida a assinatura do opt-in: `201` com `autorizacaoId`, `400` para payload inválido e `401`
-  para assinatura ausente/inválida. Na API, falha de integração com a Central vira `502`.
+- `CentralClient`: chamadas HTTP com timeout e assinatura HMAC enviada no header `X-Signature`. No opt-in,
+  o corpo exato é assinado; no registro da operação, o adapter assina o corpo canônico em pt-BR sem o
+  campo `assinatura` e envia o HMAC também nesse campo. Qualquer resposta diferente da esperada (`201` no
+  opt-in, `202` no registro), corpo ausente/inválido ou protocolo em branco vira
+  `CentralUnavailableException` (`502`). `Retry-After` e backoff são F04.
+- A Central valida as duas assinaturas: `201` com `autorizacaoId` no opt-in e `202` com `protocolo` no
+  registro; `400` para payload inválido e `401` para assinatura ausente/inválida. O protocolo do mock é
+  determinístico por payload. Na API, falha de integração vira `502`.
 - `HmacSignatureService`: HMAC-SHA256 em Base64 com segredo de `central.hmac-secret`; verificação em
   tempo constante.
-- Idempotência: gerar chave estável a partir de beneficiário + convênio + parcelas + conta; antes de
-  registrar, consultar `findByProtocol`/chave e devolver a operação existente.
-- Erros: falha de integração, timeout, resposta inesperada e rejeição devem gerar evento de auditoria e
-  ser traduzidos pelo adapter REST em respostas HTTP claras, exibidas no frontend.
-- Transições inválidas de `OperationStatus` devem ser rejeitadas no domínio.
+- Registro: antes de qualquer chamada à Central, `startPortability` calcula a chave SHA-256 em hex de
+  `beneficiaryId|parcelas ordenadas|credor|banco|agência|conta` e consulta `findByIdempotencyKey`; se
+  existir, devolve a operação com `created = false` (`200`). Caso contrário, exige autorização do
+  beneficiário (`403`), reconsulta a agenda e só aceita parcelas existentes, `OPEN` e com data futura,
+  sem duplicatas. A criação persiste a operação `PENDING` e anexa um evento `SOLICITADA` com o protocolo;
+  falha da Central não grava operação nem evento.
+- Erros: falha de integração, timeout e resposta inesperada são traduzidos pelo adapter REST em respostas
+  HTTP claras, exibidas no frontend. Eventos de falha/rejeição e transições de status são F07/F04.
+- Transições de `OperationStatus` (`CONFIRMED`/`REJECTED`) e seus eventos são F04/F05.
 
 ## Estratégia de testes
 

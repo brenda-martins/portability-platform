@@ -28,7 +28,7 @@ export interface ReceivingAccount {
 
 export interface PortabilityRequest {
   beneficiaryId: string;
-  installments: string[];
+  installmentIds: string[];
   creditorAssignee: string;
   receivingAccount: ReceivingAccount;
 }

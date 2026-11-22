@@ -138,11 +138,41 @@ public class CentralClient implements DiscountAgendaPort, CentralPortabilityPort
             String beneficiaryId,
             List<String> installmentIds,
             String creditorAssignee,
-            ReceivingAccount receivingAccount,
-            String signature
+            ReceivingAccount receivingAccount
     ) {
-        // TODO: POST {centralBaseUrl}/operacoes-portabilidade -> protocol (202 Accepted) (F03)
-        throw new UnsupportedOperationException("TODO: register portability at Central");
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("beneficiarioId", beneficiaryId);
+        payload.put("parcelas", installmentIds);
+        payload.put("credorCessionario", creditorAssignee);
+        Map<String, String> account = new LinkedHashMap<>();
+        account.put("banco", receivingAccount.bank());
+        account.put("agencia", receivingAccount.agency());
+        account.put("conta", receivingAccount.account());
+        payload.put("contaRecebimento", account);
+
+        try {
+            String canonicalBody = objectMapper.writeValueAsString(payload);
+            String signature = signaturePort.sign(canonicalBody);
+            payload.put("assinatura", signature);
+            String body = objectMapper.writeValueAsString(payload);
+
+            ResponseEntity<CentralOperationResponse> response = restClient.post()
+                    .uri("/operacoes-portabilidade")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .header("X-Signature", signature)
+                    .body(body)
+                    .retrieve()
+                    .toEntity(CentralOperationResponse.class);
+
+            CentralOperationResponse result = response.getBody();
+            if (response.getStatusCode() != HttpStatus.ACCEPTED
+                    || result == null || isBlank(result.protocolo())) {
+                throw new CentralUnavailableException("Resposta inesperada da Central");
+            }
+            return result.protocolo();
+        } catch (RestClientException | JacksonException exception) {
+            throw new CentralUnavailableException("Central indisponível", exception);
+        }
     }
 
     @Override
@@ -152,6 +182,9 @@ public class CentralClient implements DiscountAgendaPort, CentralPortabilityPort
     }
 
     private record CentralAuthorizationResponse(String autorizacaoId) {
+    }
+
+    private record CentralOperationResponse(String protocolo) {
     }
 
     private record CentralInstallment(String parcelaId, String convenioId, BigDecimal valor,

@@ -174,7 +174,7 @@ Ver [`AGENTS.md`](AGENTS.md), seção "Agentes e skills".
 | `GET` | `/api/health` | `200` | Verificação de disponibilidade |
 | `POST` | `/api/authorizations` | `201`, `200` (reenvio), `400`, `502` | Registrar opt-in do beneficiário |
 | `GET` | `/api/beneficiaries/{beneficiaryId}/agenda` | `200`, `400`, `403`, `502` | Listar parcelas da agenda de beneficiário autorizado |
-| `POST` | `/api/portability` | `404` | Iniciar operação de portabilidade |
+| `POST` | `/api/portability` | `201`, `200` (reenvio), `400`, `403`, `502` | Registrar operação de portabilidade com conta de recebimento |
 | `GET` | `/api/portability/{operationId}` | `404` | Consultar status da operação |
 | `GET` | `/api/portability/{operationId}/audit` | `404` | Consultar trilha de eventos |
 
@@ -186,12 +186,17 @@ Ver [`AGENTS.md`](AGENTS.md), seção "Agentes e skills".
 | --- | --- | --- | --- |
 | `POST` | `/central/autorizacoes` | `201`, `400`, `401` | Registrar autorização; `201` devolve `{ "autorizacaoId": "..." }` |
 | `GET` | `/central/beneficiarios/{beneficiaryId}/agenda` | `200` | Listar parcelas (fixture fixa por beneficiário) |
-| `POST` | `/central/operacoes-portabilidade` | `501` | Registrar operação com `{ "protocolo": "..." }` |
+| `POST` | `/central/operacoes-portabilidade` | `202`, `400`, `401` | Registrar operação; `202` devolve `{ "protocolo": "..." }` |
 | `GET` | `/central/operacoes-portabilidade/{protocol}` | `501` | Consultar status ou `204` + `Retry-After` enquanto pendente |
 
 `POST /central/autorizacoes` exige o cabeçalho `X-Signature`: HMAC-SHA256 em Base64 do corpo exato da
 requisição, calculado com `central.hmac-secret` (`CENTRAL_HMAC_SECRET`). Assinatura ausente ou inválida
 responde `401`; payload com campos em branco responde `400`.
+
+`POST /central/operacoes-portabilidade` também envia `X-Signature`, mas assina o corpo canônico em pt-BR
+**sem** o campo `assinatura` (o valor calculado é gravado nesse campo e no cabeçalho). O protocolo do mock
+é `PRT-` seguido de um UUID determinístico derivado do corpo canônico, portanto o mesmo payload devolve o
+mesmo protocolo. Assinatura ausente/inválida responde `401` e payload inválido responde `400`.
 
 Payloads da Central (pt-BR, conforme o PDF):
 
@@ -212,6 +217,22 @@ Payloads da Central (pt-BR, conforme o PDF):
   { "installmentId": "INS-1", "agreementId": "AGR-001", "amount": 120.5,
     "discountDate": "2099-01-10", "status": "OPEN" }
 ]
+
+// POST /api/portability
+{
+  "beneficiaryId": "BEN-123",
+  "installmentIds": ["INS-1"],
+  "creditorAssignee": "Nova Credora S.A.",
+  "receivingAccount": { "bank": "001", "agency": "1234", "account": "56789-0" }
+}
+// resposta 201 (criação) ou 200 (reenvio da mesma solicitação)
+{
+  "operationId": "OPE-...", "beneficiaryId": "BEN-123", "installmentIds": ["INS-1"],
+  "creditorAssignee": "Nova Credora S.A.",
+  "receivingAccount": { "bank": "001", "agency": "1234", "account": "56789-0" },
+  "status": "PENDING", "protocol": "PRT-...", "rejectionReason": null,
+  "requestedAt": "2026-11-22T12:34:56Z"
+}
 
 // POST /central/operacoes-portabilidade
 {
@@ -253,6 +274,7 @@ memória com `ddl-auto: create-drop`. Mapeamentos de domínio em
 | --- | --- | --- |
 | `operation_id` | String (PK) | Identificador da operação |
 | `beneficiary_id` | String (not null) | Beneficiário |
+| `idempotency_key` | String (unique) | Hash SHA-256 da solicitação, usado para reconhecer reenvios |
 | `creditor_assignee` | String | Novo credor |
 | `bank` / `agency` / `account` | String | Conta de recebimento (modelo `ReceivingAccount`) |
 | `status` | Enum string | `PENDING`, `CONFIRMED` ou `REJECTED` |
@@ -273,7 +295,7 @@ As parcelas selecionadas são armazenadas na tabela de coleção `operation_inst
 | `message` | String | Detalhe legível, inclusive retorno da Central |
 | `occurred_at` | Instant (not null) | Ordenação da trilha |
 
-Eventos devem ser **append-only**: nunca atualizados nem apagados (regra a implementar).
+Eventos são gravados por `append` e devem ser **append-only**: nunca atualizados nem apagados.
 
 ---
 

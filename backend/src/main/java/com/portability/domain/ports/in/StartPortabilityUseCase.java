@@ -1,13 +1,13 @@
 package com.portability.domain.ports.in;
 
-import com.portability.domain.model.PortabilityOperation;
+import com.portability.domain.model.PortabilityOperationResult;
 import com.portability.domain.model.ReceivingAccount;
 
 import java.util.List;
 
 public interface StartPortabilityUseCase {
 
-    PortabilityOperation startPortability(
+    PortabilityOperationResult startPortability(
             String beneficiaryId,
             List<String> installmentIds,
             String creditorAssignee,

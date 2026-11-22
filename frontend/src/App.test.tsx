@@ -85,7 +85,7 @@ describe('App', () => {
     cleanup();
   });
 
-  it('deve renderizar os quatro painéis sem placeholders quando a tela carrega', () => {
+  it('It should render all four panels without placeholders when the screen loads', () => {
     render(<App />);
 
     expect(screen.getByRole('heading', { name: /portability platform/i })).toBeTruthy();
@@ -96,7 +96,7 @@ describe('App', () => {
     expect(screen.queryByText(/todo:/i)).toBeNull();
   });
 
-  it('deve enviar o opt-in quando o beneficiário informa id e convênio', async () => {
+  it('the opt-in must be sent when the beneficiary provides their ID and health plan details', async () => {
     respondWith(authorization);
     render(<App />);
 
@@ -111,7 +111,7 @@ describe('App', () => {
     });
   });
 
-  it('deve exibir a falha da API quando a autorização retorna erro', async () => {
+  it('should display the API failure when authorization returns an error', async () => {
     mockedApiFetch.mockRejectedValue(new Error('Request failed: 502'));
     render(<App />);
 
@@ -122,7 +122,7 @@ describe('App', () => {
     expect(alert.textContent).toContain('502');
   });
 
-  it('deve exibir a mensagem devolvida pela API quando a autorização falha', async () => {
+  it('should display the message returned by the API when authorization fails', async () => {
     mockedApiFetch.mockRejectedValue(new Error('Central indisponível'));
     render(<App />);
 
@@ -133,7 +133,7 @@ describe('App', () => {
     expect(alert.textContent).toContain('Central indisponível');
   });
 
-  it('deve habilitar a agenda somente depois da autorização', async () => {
+  it('should enable the schedule only after authorization', async () => {
     respondByPath({ '/authorizations': authorization });
     render(<App />);
 
@@ -144,7 +144,7 @@ describe('App', () => {
     expect((screen.getByRole('button', { name: /consultar agenda/i }) as HTMLButtonElement).disabled).toBe(false);
   });
 
-  it('deve enviar o beneficiário autorizado quando a agenda é consultada', async () => {
+  it('the authorized beneficiary must be submitted when the schedule is consulted', async () => {
     respondByPath({ '/authorizations': authorization });
     render(<App />);
     await authorize();
@@ -157,7 +157,7 @@ describe('App', () => {
     });
   });
 
-  it('deve exibir convênio, valor, data e status das parcelas consultadas', async () => {
+  it('it must display the agreement, amount, date, and status of the installments queried', async () => {
     respondByPath({ '/authorizations': authorization });
     render(<App />);
     await authorize();
@@ -172,7 +172,7 @@ describe('App', () => {
     expect(row?.textContent).toContain('OPEN');
   });
 
-  it('deve exibir estado vazio quando a agenda não tem parcelas', async () => {
+  it('should display an empty state when the schedule has no installments', async () => {
     respondByPath({ '/authorizations': authorization });
     render(<App />);
     await authorize();
@@ -182,7 +182,7 @@ describe('App', () => {
     expect(await screen.findByText(/nenhuma parcela futura disponível/i)).toBeTruthy();
   });
 
-  it('deve exibir a mensagem de erro da API quando a consulta da agenda falha', async () => {
+  it('should display the API error message when the schedule query fails', async () => {
     respondByPath({ '/authorizations': authorization });
     render(<App />);
     await authorize();
@@ -193,7 +193,7 @@ describe('App', () => {
     expect(alert.textContent).toContain('Beneficiário não autorizado');
   });
 
-  it('deve permitir selecionar apenas parcelas abertas e futuras', async () => {
+  it('must allow selecting only open and future installments', async () => {
     respondByPath({ '/authorizations': authorization });
     render(<App />);
     await authorize();
@@ -206,7 +206,7 @@ describe('App', () => {
     expect((screen.getByLabelText(/INS-3/) as HTMLInputElement).disabled).toBe(true);
   });
 
-  it('deve enviar conta, credor e parcelas selecionadas quando a operação é registrada', async () => {
+  it('the account, creditor, and selected installments must be submitted when the transaction is recorded', async () => {
     respondByPath({ '/authorizations': authorization });
     render(<App />);
     await authorize();
@@ -225,7 +225,7 @@ describe('App', () => {
         method: 'POST',
         body: JSON.stringify({
           beneficiaryId: 'BEN-123',
-          installments: ['INS-1'],
+          installmentIds: ['INS-1'],
           creditorAssignee: 'Nova Credora S.A.',
           receivingAccount: { bank: '001', agency: '1234', account: '56789-0' },
         }),
@@ -233,7 +233,20 @@ describe('App', () => {
     });
   });
 
-  it('deve exibir o motivo da rejeição quando a operação é rejeitada', async () => {
+  it('should display the API error message when registration fails', async () => {
+    respondByPath({ '/authorizations': authorization });
+    render(<App />);
+    await authorize();
+    fillOperationForm();
+    mockedApiFetch.mockRejectedValueOnce(new Error('Parcela já portada'));
+
+    fireEvent.click(screen.getByRole('button', { name: /registrar portabilidade/i }));
+
+    const alert = await screen.findByRole('alert');
+    expect(alert.textContent).toContain('Parcela já portada');
+  });
+
+  it('must display the reason for rejection when the operation is rejected', async () => {
     const rejected: PortabilityOperation = {
       operationId: 'OPE-2',
       status: 'REJECTED',
@@ -251,7 +264,7 @@ describe('App', () => {
     expect(alert.textContent).toContain('Convênio bloqueado');
   });
 
-  it('deve exibir os eventos quando a auditoria é consultada', async () => {
+  it('it should display the events when the audit is consulted', async () => {
     const events: AuditEvent[] = [
       {
         eventId: 'EVT-1',
@@ -281,7 +294,7 @@ describe('App', () => {
     expect(await screen.findByText('Operação solicitada')).toBeTruthy();
   });
 
-  it('deve exibir estado vazio quando a auditoria não tem eventos', async () => {
+  it('should display an empty state when the audit has no events', async () => {
     mockedApiFetch.mockImplementation(async (path) => {
       if (path === '/authorizations') return authorization as never;
       if (path.endsWith('/audit')) return [] as never;

@@ -17,13 +17,27 @@ public class AuditEventRepositoryAdapter implements AuditEventRepository {
 
     @Override
     public AuditEvent append(AuditEvent event) {
-        // TODO: append-only mapping and persistence (events are never overwritten).
-        throw new UnsupportedOperationException("TODO: append audit event");
+        AuditEventJpaEntity entity = new AuditEventJpaEntity();
+        entity.setEventId(event.eventId());
+        entity.setOperationId(event.operationId());
+        entity.setEventType(event.eventType());
+        entity.setMessage(event.message());
+        entity.setOccurredAt(event.occurredAt());
+        return toDomain(repository.save(entity));
     }
 
     @Override
     public List<AuditEvent> findByOperationId(String operationId) {
-        // TODO: query and map to the domain model.
+        // TODO: query and map to the domain model (F06).
         throw new UnsupportedOperationException("TODO: find audit events");
+    }
+
+    private static AuditEvent toDomain(AuditEventJpaEntity entity) {
+        return new AuditEvent(
+                entity.getEventId(),
+                entity.getOperationId(),
+                entity.getEventType(),
+                entity.getMessage(),
+                entity.getOccurredAt());
     }
 }

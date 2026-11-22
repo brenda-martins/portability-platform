@@ -8,13 +8,12 @@ import java.util.List;
 /** Outbound port for the external Central de Convênios integration. */
 public interface CentralPortabilityPort {
 
-    /** Registers the operation and returns the protocol supplied by the Central. */
+    /** Registers the signed operation and returns the protocol supplied by the Central. */
     String registerPortability(
             String beneficiaryId,
             List<String> installmentIds,
             String creditorAssignee,
-            ReceivingAccount receivingAccount,
-            String signature
+            ReceivingAccount receivingAccount
     );
 
     /** Queries the asynchronous confirmation for a protocol. */

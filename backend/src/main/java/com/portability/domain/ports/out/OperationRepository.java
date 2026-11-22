@@ -6,7 +6,9 @@ import java.util.Optional;
 
 public interface OperationRepository {
 
-    PortabilityOperation save(PortabilityOperation operation);
+    PortabilityOperation save(PortabilityOperation operation, String idempotencyKey);
+
+    Optional<PortabilityOperation> findByIdempotencyKey(String idempotencyKey);
 
     Optional<PortabilityOperation> findById(String operationId);
 

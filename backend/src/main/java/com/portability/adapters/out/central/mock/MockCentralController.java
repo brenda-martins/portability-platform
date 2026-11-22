@@ -3,6 +3,7 @@ package com.portability.adapters.out.central.mock;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ObjectNode;
 import com.portability.domain.ports.out.SignaturePort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -15,6 +16,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -85,8 +87,56 @@ public class MockCentralController {
     }
 
     @PostMapping("/operacoes-portabilidade")
-    public ResponseEntity<Void> registerPortability(@RequestBody Map<String, Object> body) {
-        return ResponseEntity.status(HttpStatus.NOT_IMPLEMENTED).build();
+    public ResponseEntity<?> registerPortability(
+            @RequestBody String body,
+            @RequestHeader(value = "X-Signature", required = false) String signature
+    ) {
+        JsonNode payload;
+        String canonicalBody;
+        try {
+            payload = objectMapper.readTree(body);
+            if (payload == null || !payload.isObject()) {
+                return ResponseEntity.badRequest().build();
+            }
+            ObjectNode canonical = (ObjectNode) payload.deepCopy();
+            canonical.remove("assinatura");
+            canonicalBody = objectMapper.writeValueAsString(canonical);
+        } catch (JacksonException exception) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        if (signature == null || !signaturePort.verify(canonicalBody, signature)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        if (!isValidPortabilityPayload(payload)) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        String protocol = "PRT-" + UUID.nameUUIDFromBytes(canonicalBody.getBytes(StandardCharsets.UTF_8))
+                .toString().replace("-", "");
+        return ResponseEntity.status(HttpStatus.ACCEPTED).body(Map.of("protocolo", protocol));
+    }
+
+    private static boolean isValidPortabilityPayload(JsonNode payload) {
+        if (isBlank(payload.path("beneficiarioId").asText(""))
+                || isBlank(payload.path("assinatura").asText(""))
+                || isBlank(payload.path("credorCessionario").asText(""))) {
+            return false;
+        }
+        JsonNode installments = payload.path("parcelas");
+        if (!installments.isArray() || installments.isEmpty()) {
+            return false;
+        }
+        for (JsonNode installment : installments) {
+            if (isBlank(installment.asText(""))) {
+                return false;
+            }
+        }
+        JsonNode account = payload.path("contaRecebimento");
+        return account.isObject()
+                && !isBlank(account.path("banco").asText(""))
+                && !isBlank(account.path("agencia").asText(""))
+                && !isBlank(account.path("conta").asText(""));
     }
 
     @GetMapping("/operacoes-portabilidade/{protocol}")

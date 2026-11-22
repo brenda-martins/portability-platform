@@ -8,6 +8,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
 import jakarta.persistence.Table;
 
 import java.time.Instant;
@@ -25,8 +26,11 @@ public class OperationJpaEntity {
     @Column(name = "beneficiary_id", nullable = false)
     private String beneficiaryId;
 
+    @Column(name = "idempotency_key", unique = true)
+    private String idempotencyKey;
+
     @ElementCollection
-    @CollectionTable(name = "operation_installments", joinColumns = @jakarta.persistence.JoinColumn(name = "operation_id"))
+    @CollectionTable(name = "operation_installments", joinColumns = @JoinColumn(name = "operation_id"))
     @Column(name = "installment_id")
     private List<String> installmentIds = new ArrayList<>();
 
@@ -54,4 +58,100 @@ public class OperationJpaEntity {
 
     @Column(name = "requested_at", nullable = false)
     private Instant requestedAt;
+
+    public String getOperationId() {
+        return operationId;
+    }
+
+    public void setOperationId(String operationId) {
+        this.operationId = operationId;
+    }
+
+    public String getBeneficiaryId() {
+        return beneficiaryId;
+    }
+
+    public void setBeneficiaryId(String beneficiaryId) {
+        this.beneficiaryId = beneficiaryId;
+    }
+
+    public String getIdempotencyKey() {
+        return idempotencyKey;
+    }
+
+    public void setIdempotencyKey(String idempotencyKey) {
+        this.idempotencyKey = idempotencyKey;
+    }
+
+    public List<String> getInstallmentIds() {
+        return installmentIds;
+    }
+
+    public void setInstallmentIds(List<String> installmentIds) {
+        this.installmentIds = installmentIds;
+    }
+
+    public String getCreditorAssignee() {
+        return creditorAssignee;
+    }
+
+    public void setCreditorAssignee(String creditorAssignee) {
+        this.creditorAssignee = creditorAssignee;
+    }
+
+    public String getBank() {
+        return bank;
+    }
+
+    public void setBank(String bank) {
+        this.bank = bank;
+    }
+
+    public String getAgency() {
+        return agency;
+    }
+
+    public void setAgency(String agency) {
+        this.agency = agency;
+    }
+
+    public String getAccount() {
+        return account;
+    }
+
+    public void setAccount(String account) {
+        this.account = account;
+    }
+
+    public OperationStatus getStatus() {
+        return status;
+    }
+
+    public void setStatus(OperationStatus status) {
+        this.status = status;
+    }
+
+    public String getProtocol() {
+        return protocol;
+    }
+
+    public void setProtocol(String protocol) {
+        this.protocol = protocol;
+    }
+
+    public String getRejectionReason() {
+        return rejectionReason;
+    }
+
+    public void setRejectionReason(String rejectionReason) {
+        this.rejectionReason = rejectionReason;
+    }
+
+    public Instant getRequestedAt() {
+        return requestedAt;
+    }
+
+    public void setRequestedAt(Instant requestedAt) {
+        this.requestedAt = requestedAt;
+    }
 }

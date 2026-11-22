@@ -17,7 +17,7 @@ public class ApiExceptionHandler {
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<Map<String, String>> handleValidation(MethodArgumentNotValidException exception) {
         return ResponseEntity.badRequest()
-                .body(Map.of("message", "beneficiaryId e agreementId são obrigatórios"));
+                .body(Map.of("message", "Solicitação inválida: verifique os campos obrigatórios"));
     }
 
     @ExceptionHandler(IllegalArgumentException.class)

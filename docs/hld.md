@@ -36,7 +36,7 @@ flowchart LR
 | `application` | Orquestrar casos de uso usando ports | Conhecer HTTP, JPA ou a Central |
 | `domain` | Modelo, invariantes e contratos (ports) | Depender de framework |
 | `adapters/out/persistence` | Persistir em PostgreSQL via JPA e mapear para o domínio | Definir regras de negócio |
-| `adapters/out/central` | Falhar com a Central, assinar/verificar e traduzir o contrato | Expor tipos da Central ao domínio |
+| `adapters/out/central` | Falar com a Central, assinar/verificar e traduzir o contrato | Expor tipos da Central ao domínio |
 
 A regra de dependência é sempre **para o domínio**. A Central simulada é um adapter interno, não um
 terceiro projeto.
@@ -59,9 +59,12 @@ sequenceDiagram
     F->>A: GET /api/beneficiaries/{id}/agenda
     A->>A: verifica autorização
     A->>C: GET /central/beneficiarios/{id}/agenda
-    C-->>A: parcelas futuras
-    A-->>F: parcelas elegíveis
+    C-->>A: lista completa de parcelas
+    A-->>F: parcelas da agenda
 ```
+
+A seleção de parcelas elegíveis acontece no registro (F03), não nesta consulta; detalhes em
+[`lld.md`](lld.md), seção "Integração, idempotência e erros".
 
 ## Fluxo 2 — registro e confirmação assíncrona
 
@@ -72,18 +75,16 @@ sequenceDiagram
     participant C as Central /central
 
     F->>A: POST /api/portability (parcelas + conta)
-    A->>A: chave de idempotência + evento "solicitada"
-    A->>C: POST /central/operacoes-portabilidade (HMAC)
-    C-->>A: 202 com protocolo
-    A-->>F: operação PENDING
-    loop consulta com backoff
-        A->>C: GET /central/operacoes-portabilidade/{protocolo}
-        C-->>A: 204 + Retry-After (PENDENTE)
+    A->>A: valida idempotência e elegibilidade
+    alt reenvio da mesma solicitação
+        A-->>F: 200 com operação existente
+    else solicitação nova
+        A->>C: POST /central/operacoes-portabilidade (HMAC)
+        C-->>A: 202 com protocolo
+        A->>A: grava operação PENDING e evento "solicitada"
+        A-->>F: 201 com operação
     end
-    C-->>A: status CONFIRMADA ou REJEITADA
-    A->>A: grava evento, atualiza operação e conta de recebimento
-    F->>A: GET /api/portability/{operationId}
-    A-->>F: status final e trilha
+    Note over A,C: F04/F05 adicionam consulta com backoff, status final e conta; F06 expõe a trilha
 ```
 
 ## Documentos relacionados

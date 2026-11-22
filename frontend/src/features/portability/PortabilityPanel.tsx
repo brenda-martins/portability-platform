@@ -33,7 +33,7 @@ export function PortabilityPanel({
         method: 'POST',
         body: JSON.stringify({
           beneficiaryId: authorization.beneficiaryId,
-          installments: selectedInstallmentIds,
+          installmentIds: selectedInstallmentIds,
           creditorAssignee,
           receivingAccount: { bank, agency, account },
         }),

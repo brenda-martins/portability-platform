@@ -7,4 +7,6 @@ import java.util.Optional;
 public interface SpringDataOperationRepository extends JpaRepository<OperationJpaEntity, String> {
 
     Optional<OperationJpaEntity> findByProtocol(String protocol);
+
+    Optional<OperationJpaEntity> findByIdempotencyKey(String idempotencyKey);
 }

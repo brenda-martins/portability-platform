@@ -1,10 +1,37 @@
 package com.portability.adapters.in.web;
 
+import com.portability.domain.model.PortabilityOperation;
+import com.portability.domain.model.PortabilityOperationResult;
+import com.portability.domain.model.ReceivingAccount;
+import com.portability.domain.ports.in.StartPortabilityUseCase;
+import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-/** TODO: POST /api/portability (start) and GET /api/portability/{operationId} (status). */
+/** POST starts a portability operation. */
 @RestController
 @RequestMapping("/api/portability")
 public class PortabilityController {
+
+    private final StartPortabilityUseCase startPortabilityUseCase;
+
+    public PortabilityController(StartPortabilityUseCase startPortabilityUseCase) {
+        this.startPortabilityUseCase = startPortabilityUseCase;
+    }
+
+    @PostMapping
+    public ResponseEntity<PortabilityOperation> start(@Valid @RequestBody PortabilityRequest request) {
+        ReceivingAccount account = new ReceivingAccount(
+                request.receivingAccount().bank(),
+                request.receivingAccount().agency(),
+                request.receivingAccount().account());
+        PortabilityOperationResult result = startPortabilityUseCase.startPortability(
+                request.beneficiaryId(), request.installmentIds(), request.creditorAssignee(), account);
+        HttpStatus status = result.created() ? HttpStatus.CREATED : HttpStatus.OK;
+        return ResponseEntity.status(status).body(result.operation());
+    }
 }
