@@ -250,9 +250,12 @@ public class PortabilityApplicationService implements
     }
 
     @Override
-    public List<AuditEvent> getAuditTrail(String operationId) {
-        // TODO: return the immutable event trail ordered by occurrence time.
-        throw new UnsupportedOperationException("TODO: getAuditTrail");
+    public Optional<List<AuditEvent>> getAuditTrail(String operationId) {
+        requireNotBlank(operationId, "operationId");
+        if (operationRepository.findById(operationId).isEmpty()) {
+            return Optional.empty();
+        }
+        return Optional.of(auditEventRepository.findByOperationId(operationId));
     }
 
     private static void requireAccount(ReceivingAccount account) {

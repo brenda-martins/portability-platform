@@ -20,6 +20,8 @@ export function AuditPanel({ operation }: AuditPanelProps) {
   async function handleConsult(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
+    setEvents([]);
+    setConsulted(false);
     setLoading(true);
     setError(null);
     try {

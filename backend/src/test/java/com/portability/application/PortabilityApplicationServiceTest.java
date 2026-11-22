@@ -528,6 +528,41 @@ class PortabilityApplicationServiceTest {
         verifyNoInteractions(operationRepository, centralPortabilityPort, auditEventRepository);
     }
 
+    @Test
+    void shouldReturnAuditEventsWhenOperationExists() {
+        List<AuditEvent> events = List.of(
+                new AuditEvent("EVT-1", "OPE-1", "SOLICITADA", "Operação solicitada",
+                        Instant.parse("2026-11-22T12:34:56Z")),
+                new AuditEvent("EVT-2", "OPE-1", "CONFIRMADA", "Operação confirmada",
+                        Instant.parse("2026-11-22T12:35:56Z")));
+        when(operationRepository.findById("OPE-1")).thenReturn(Optional.of(operation("OPE-1")));
+        when(auditEventRepository.findByOperationId("OPE-1")).thenReturn(events);
+
+        Optional<List<AuditEvent>> result = service.getAuditTrail("OPE-1");
+
+        assertTrue(result.isPresent());
+        assertEquals(events, result.get());
+        verify(auditEventRepository).findByOperationId("OPE-1");
+        verify(auditEventRepository, never()).append(any());
+        verifyNoInteractions(centralPortabilityPort, centralAuthorizationPort, backoffPort);
+    }
+
+    @Test
+    void mustReturnEmptyAuditTrailWhenOperationDoesNotExist() {
+        when(operationRepository.findById("missing")).thenReturn(Optional.empty());
+
+        assertTrue(service.getAuditTrail("missing").isEmpty());
+
+        verifyNoInteractions(auditEventRepository, centralPortabilityPort, centralAuthorizationPort);
+    }
+
+    @Test
+    void mustRejectBlankOperationIdBeforeConsultingAudit() {
+        assertThrows(IllegalArgumentException.class, () -> service.getAuditTrail(" "));
+
+        verifyNoInteractions(operationRepository, auditEventRepository, centralPortabilityPort);
+    }
+
     private void stubAuthorizationAndAgenda(List<DiscountInstallment> agenda) {
         when(operationRepository.findByIdempotencyKey(anyString())).thenReturn(Optional.empty());
         when(authorizationRepository.existsByBeneficiaryId(BENEFICIARY_ID)).thenReturn(true);

@@ -109,6 +109,12 @@ async function waitForUpdateFormToShowBank(bank: string) {
   });
 }
 
+async function waitForAuditOperationId(value: string) {
+  await waitFor(() => {
+    expect((screen.getByLabelText(/id da operação/i) as HTMLInputElement).value).toBe(value);
+  });
+}
+
 describe('App', () => {
   beforeEach(() => {
     vi.resetAllMocks();
@@ -438,5 +444,56 @@ describe('App', () => {
 
     const alert = await screen.findByRole('alert');
     expect(alert.textContent).toContain('502');
+  });
+
+  it('must consult the audit using the registered operation id', async () => {
+    await registerOperationWithStatus(operation, { '/portability/OPE-1/audit': [] });
+    await waitForAuditOperationId('OPE-1');
+
+    fireEvent.click(screen.getByRole('button', { name: /consultar auditoria/i }));
+
+    await waitFor(() => {
+      expect(mockedApiFetch).toHaveBeenCalledWith('/portability/OPE-1/audit');
+    });
+  });
+
+  it('must display the API error message when the audit consultation fails', async () => {
+    await registerOperationWithStatus(operation);
+    await waitForAuditOperationId('OPE-1');
+    mockedApiFetch.mockImplementation(async (path) => {
+      if (path.endsWith('/audit')) throw new Error('Operação não encontrada');
+      return [] as never;
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /consultar auditoria/i }));
+
+    const alert = await screen.findByRole('alert');
+    expect(alert.textContent).toContain('Operação não encontrada');
+  });
+
+  it('must clear the previous trail when a new audit consultation fails', async () => {
+    const events: AuditEvent[] = [
+      {
+        eventId: 'EVT-1',
+        operationId: 'OPE-1',
+        eventType: 'SOLICITADA',
+        message: 'Trilha antiga',
+        occurredAt: '2026-01-01T10:00:00Z',
+      },
+    ];
+    await registerOperationWithStatus(operation, { '/portability/OPE-1/audit': events });
+    await waitForAuditOperationId('OPE-1');
+    fireEvent.click(screen.getByRole('button', { name: /consultar auditoria/i }));
+    expect(await screen.findByText('Trilha antiga')).toBeTruthy();
+
+    mockedApiFetch.mockImplementation(async (path) => {
+      if (path.endsWith('/audit')) throw new Error('Operação não encontrada');
+      return [] as never;
+    });
+    fireEvent.change(screen.getByLabelText(/id da operação/i), { target: { value: 'OPE-2' } });
+    fireEvent.click(screen.getByRole('button', { name: /consultar auditoria/i }));
+
+    expect(await screen.findByRole('alert')).toBeTruthy();
+    await waitFor(() => expect(screen.queryByText('Trilha antiga')).toBeNull());
   });
 });

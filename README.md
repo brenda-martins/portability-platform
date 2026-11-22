@@ -177,7 +177,7 @@ Ver [`AGENTS.md`](AGENTS.md), seção "Agentes e skills".
 | `POST` | `/api/portability` | `201`, `200` (reenvio), `400`, `403`, `502` | Registrar operação de portabilidade com conta de recebimento |
 | `GET` | `/api/portability/{operationId}` | `200`, `404`, `502` | Consultar status da operação (acompanha a confirmação na Central) |
 | `PUT` | `/api/portability/{operationId}/receiving-account` | `200`, `400`, `404`, `409`, `502` | Atualizar a conta de recebimento após a confirmação |
-| `GET` | `/api/portability/{operationId}/audit` | `404` | Consultar trilha de eventos |
+| `GET` | `/api/portability/{operationId}/audit` | `200`, `404` | Consultar trilha de eventos da operação |
 
 `GET /api/portability/{operationId}` consulta a Central enquanto a operação está `PENDING`, respeitando
 `Retry-After` com backoff (política em [`docs/lld.md`](docs/lld.md), seção "Integração, idempotência e
@@ -189,6 +189,11 @@ tentativas, o status continua `PENDING` e uma nova consulta retoma o acompanhame
 operações `CONFIRMED` (`409` caso contrário). A conta é enviada assinada à Central pelo protocolo, a operação
 local é atualizada e um evento `CONTA_ATUALIZADA` é anexado à trilha. Um reenvio com a conta igual à atual
 responde `200` sem chamar a Central e sem gerar evento. Falha da Central responde `502` e não altera a conta.
+
+`GET /api/portability/{operationId}/audit` devolve os eventos imutáveis da operação em ordem crescente de
+`occurredAt`, com `{ eventId, operationId, eventType, message, occurredAt }`. Operação existente sem eventos
+responde `200` com `[]`; operação inexistente responde `404` sem corpo. A consulta não chama a Central nem
+grava eventos.
 
 ### Central de Convênios simulada (`/central`)
 
@@ -278,6 +283,12 @@ Payloads da Central (pt-BR, conforme o PDF):
 }
 // resposta 200
 { "banco": "002", "agencia": "4321", "conta": "98765-4" }
+
+// GET /api/portability/OPE-1/audit
+[
+  { "eventId": "EVT-1", "operationId": "OPE-1", "eventType": "SOLICITADA",
+    "message": "Operação solicitada com protocolo PRT-1", "occurredAt": "2026-11-22T12:34:56Z" }
+]
 ```
 
 A agenda exige uma autorização registrada para o beneficiário; sem ela, a API responde `403`. A

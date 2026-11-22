@@ -95,8 +95,22 @@ sequenceDiagram
     C-->>A: 200 com a conta aceita
     A->>A: atualiza conta local e anexa evento CONTA_ATUALIZADA
     A-->>F: 200 com a operação atualizada
-    Note over A,C: F06 expõe a trilha; F07 trata rejeições e falhas da Central
+    Note over A,C: F07 trata rejeições e falhas da Central
 ```
+
+## Fluxo 3 — trilha de auditoria
+
+```mermaid
+sequenceDiagram
+    participant F as Frontend
+    participant A as API /api
+
+    F->>A: GET /api/portability/{operationId}/audit
+    A->>A: verifica a operação e lê os eventos append-only
+    A-->>F: 200 com eventos ordenados (ou 404 se inexistente)
+```
+
+A consulta é somente leitura: não chama a Central, não acrescenta eventos e não altera a operação.
 
 ## Documentos relacionados
 

@@ -28,8 +28,9 @@ public class AuditEventRepositoryAdapter implements AuditEventRepository {
 
     @Override
     public List<AuditEvent> findByOperationId(String operationId) {
-        // TODO: query and map to the domain model (F06).
-        throw new UnsupportedOperationException("TODO: find audit events");
+        return repository.findByOperationIdOrderByOccurredAtAsc(operationId).stream()
+                .map(AuditEventRepositoryAdapter::toDomain)
+                .toList();
     }
 
     private static AuditEvent toDomain(AuditEventJpaEntity entity) {
