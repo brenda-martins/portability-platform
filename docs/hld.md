@@ -84,7 +84,12 @@ sequenceDiagram
         A->>A: grava operação PENDING e evento "solicitada"
         A-->>F: 201 com operação
     end
-    Note over A,C: F04/F05 adicionam consulta com backoff, status final e conta; F06 expõe a trilha
+    F->>A: GET /api/portability/{operationId}
+    A->>C: GET /central/operacoes-portabilidade/{protocol} (Retry-After)
+    C-->>A: 204 pendente (2x) ou 200 com status final
+    A->>A: atualiza status e anexa evento quando há transição
+    A-->>F: 200 com a operação (ainda PENDING se não confirmou)
+    Note over A,C: F05 atualiza a conta após CONFIRMED; F06 expõe a trilha
 ```
 
 ## Documentos relacionados

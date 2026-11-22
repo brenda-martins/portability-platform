@@ -5,6 +5,7 @@ import tools.jackson.databind.ObjectMapper;
 import com.portability.domain.model.CentralOperationStatus;
 import com.portability.domain.model.DiscountInstallment;
 import com.portability.domain.model.InstallmentStatus;
+import com.portability.domain.model.OperationStatus;
 import com.portability.domain.model.ReceivingAccount;
 import com.portability.domain.ports.out.CentralAuthorizationPort;
 import com.portability.domain.ports.out.CentralPortabilityPort;
@@ -12,6 +13,7 @@ import com.portability.domain.ports.out.CentralUnavailableException;
 import com.portability.domain.ports.out.DiscountAgendaPort;
 import com.portability.domain.ports.out.SignaturePort;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -177,14 +179,58 @@ public class CentralClient implements DiscountAgendaPort, CentralPortabilityPort
 
     @Override
     public CentralOperationStatus consultStatus(String protocol) {
-        // TODO: GET {centralBaseUrl}/operacoes-portabilidade/{protocol} -> status / Retry-After (F04)
-        throw new UnsupportedOperationException("TODO: consult Central status");
+        try {
+            ResponseEntity<CentralOperationStatusResponse> response = restClient.get()
+                    .uri("/operacoes-portabilidade/{protocol}", protocol)
+                    .retrieve()
+                    .toEntity(CentralOperationStatusResponse.class);
+
+            if (response.getStatusCode() == HttpStatus.NO_CONTENT) {
+                return new CentralOperationStatus(OperationStatus.PENDING, null, retryAfter(response));
+            }
+            if (response.getStatusCode() != HttpStatus.OK) {
+                throw new CentralUnavailableException("Resposta inesperada da Central");
+            }
+
+            CentralOperationStatusResponse payload = response.getBody();
+            if (payload == null || isBlank(payload.status())) {
+                throw new CentralUnavailableException("Resposta inesperada da Central");
+            }
+            OperationStatus status = switch (payload.status()) {
+                case "PENDENTE" -> OperationStatus.PENDING;
+                case "CONFIRMADA" -> OperationStatus.CONFIRMED;
+                case "REJEITADA" -> OperationStatus.REJECTED;
+                default -> throw new CentralUnavailableException("Resposta inesperada da Central");
+            };
+            if (status == OperationStatus.REJECTED && isBlank(payload.motivoRejeicao())) {
+                throw new CentralUnavailableException("Resposta inesperada da Central");
+            }
+            Duration retryAfter = status == OperationStatus.PENDING ? retryAfter(response) : Duration.ZERO;
+            return new CentralOperationStatus(status, payload.motivoRejeicao(), retryAfter);
+        } catch (RestClientException | JacksonException exception) {
+            throw new CentralUnavailableException("Central indisponível", exception);
+        }
+    }
+
+    private static Duration retryAfter(ResponseEntity<?> response) {
+        String header = response.getHeaders().getFirst(HttpHeaders.RETRY_AFTER);
+        if (header == null || header.isBlank()) {
+            return Duration.ZERO;
+        }
+        try {
+            return Duration.ofSeconds(Long.parseLong(header.trim()));
+        } catch (NumberFormatException exception) {
+            throw new CentralUnavailableException("Retry-After inválido da Central", exception);
+        }
     }
 
     private record CentralAuthorizationResponse(String autorizacaoId) {
     }
 
     private record CentralOperationResponse(String protocolo) {
+    }
+
+    private record CentralOperationStatusResponse(String status, String motivoRejeicao) {
     }
 
     private record CentralInstallment(String parcelaId, String convenioId, BigDecimal valor,

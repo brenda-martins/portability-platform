@@ -5,6 +5,7 @@ import com.portability.domain.model.OperationStatus;
 import com.portability.domain.model.PortabilityOperation;
 import com.portability.domain.model.PortabilityOperationResult;
 import com.portability.domain.model.ReceivingAccount;
+import com.portability.domain.ports.in.GetOperationStatusUseCase;
 import com.portability.domain.ports.in.StartPortabilityUseCase;
 import com.portability.domain.ports.out.CentralUnavailableException;
 import org.junit.jupiter.api.BeforeEach;
@@ -16,10 +17,12 @@ import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -32,14 +35,17 @@ class PortabilityControllerContractTest {
                     + "\"receivingAccount\":{\"bank\":\"001\",\"agency\":\"1234\",\"account\":\"56789-0\"}}";
 
     private StartPortabilityUseCase startPortabilityUseCase;
+    private GetOperationStatusUseCase getOperationStatusUseCase;
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp() {
         startPortabilityUseCase = mock(StartPortabilityUseCase.class);
+        getOperationStatusUseCase = mock(GetOperationStatusUseCase.class);
         LocalValidatorFactoryBean validator = new LocalValidatorFactoryBean();
         validator.afterPropertiesSet();
-        mockMvc = MockMvcBuilders.standaloneSetup(new PortabilityController(startPortabilityUseCase))
+        mockMvc = MockMvcBuilders.standaloneSetup(
+                new PortabilityController(startPortabilityUseCase, getOperationStatusUseCase))
                 .setControllerAdvice(new ApiExceptionHandler())
                 .setValidator(validator)
                 .build();
@@ -129,6 +135,34 @@ class PortabilityControllerContractTest {
         mockMvc.perform(post("/api/portability")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(VALID_BODY))
+                .andExpect(status().isBadGateway())
+                .andExpect(jsonPath("$.message").value("Central indisponível"));
+    }
+
+    @Test
+    void shouldRespond200WithOperationWhenStatusIsConsulted() throws Exception {
+        when(getOperationStatusUseCase.getOperationStatus("OPE-1")).thenReturn(Optional.of(operation()));
+
+        mockMvc.perform(get("/api/portability/OPE-1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.operationId").value("OPE-1"))
+                .andExpect(jsonPath("$.status").value("PENDING"));
+    }
+
+    @Test
+    void shouldRespond404WhenOperationDoesNotExist() throws Exception {
+        when(getOperationStatusUseCase.getOperationStatus("missing")).thenReturn(Optional.empty());
+
+        mockMvc.perform(get("/api/portability/missing"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void mustRespond502WhenCentralFailsDuringStatusConsultation() throws Exception {
+        when(getOperationStatusUseCase.getOperationStatus("OPE-1"))
+                .thenThrow(new CentralUnavailableException("Central indisponível"));
+
+        mockMvc.perform(get("/api/portability/OPE-1"))
                 .andExpect(status().isBadGateway())
                 .andExpect(jsonPath("$.message").value("Central indisponível"));
     }

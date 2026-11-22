@@ -15,6 +15,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @SpringBootTest
@@ -26,6 +27,9 @@ class OperationRepositoryAdapterTest {
 
     @Autowired
     private OperationRepository repository;
+
+    @Autowired
+    private SpringDataOperationRepository springRepository;
 
     @Test
     void shouldSaveAndFindOperationByIdempotencyKey() {
@@ -48,6 +52,34 @@ class OperationRepositoryAdapterTest {
     @Test
     void shouldReturnEmptyWhenIdempotencyKeyIsUnknown() {
         assertTrue(repository.findByIdempotencyKey("unknown").isEmpty());
+    }
+
+    @Test
+    void shouldFindOperationByIdAndProtocol() {
+        repository.save(operation(), IDEMPOTENCY_KEY);
+
+        Optional<PortabilityOperation> byId = repository.findById("OPE-1");
+        Optional<PortabilityOperation> byProtocol = repository.findByProtocol("PRT-1");
+
+        assertTrue(byId.isPresent());
+        assertTrue(byProtocol.isPresent());
+        assertEquals("OPE-1", byId.get().operationId());
+        assertEquals("OPE-1", byProtocol.get().operationId());
+        assertEquals(List.of("INS-1", "INS-2"), byProtocol.get().installmentIds());
+    }
+
+    @Test
+    void shouldUpdateOnlyStatusAndRejectionReason() {
+        PortabilityOperation saved = repository.save(operation(), IDEMPOTENCY_KEY);
+
+        PortabilityOperation updated = repository.updateStatus("OPE-1", OperationStatus.CONFIRMED, null);
+
+        assertEquals(OperationStatus.CONFIRMED, updated.status());
+        assertEquals(saved.operationId(), updated.operationId());
+        assertEquals(saved.installmentIds(), updated.installmentIds());
+        assertEquals(saved.receivingAccount(), updated.receivingAccount());
+        assertEquals(saved.requestedAt(), updated.requestedAt());
+        assertEquals(IDEMPOTENCY_KEY, springRepository.findById("OPE-1").orElseThrow().getIdempotencyKey());
     }
 
     private static PortabilityOperation operation() {

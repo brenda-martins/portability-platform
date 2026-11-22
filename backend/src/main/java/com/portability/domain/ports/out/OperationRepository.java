@@ -1,5 +1,6 @@
 package com.portability.domain.ports.out;
 
+import com.portability.domain.model.OperationStatus;
 import com.portability.domain.model.PortabilityOperation;
 
 import java.util.Optional;
@@ -13,4 +14,6 @@ public interface OperationRepository {
     Optional<PortabilityOperation> findById(String operationId);
 
     Optional<PortabilityOperation> findByProtocol(String protocol);
+
+    PortabilityOperation updateStatus(String operationId, OperationStatus status, String rejectionReason);
 }

@@ -5,6 +5,7 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
 import com.portability.domain.ports.out.SignaturePort;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -17,9 +18,13 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Local simulation of the Central de Convênios, following the contract suggested in the PDF.
@@ -30,6 +35,8 @@ public class MockCentralController {
 
     private final SignaturePort signaturePort;
     private final ObjectMapper objectMapper;
+    private final Set<String> registeredProtocols = ConcurrentHashMap.newKeySet();
+    private final Map<String, AtomicInteger> statusConsultations = new ConcurrentHashMap<>();
 
     public MockCentralController(SignaturePort signaturePort, ObjectMapper objectMapper) {
         this.signaturePort = signaturePort;
@@ -114,6 +121,7 @@ public class MockCentralController {
 
         String protocol = "PRT-" + UUID.nameUUIDFromBytes(canonicalBody.getBytes(StandardCharsets.UTF_8))
                 .toString().replace("-", "");
+        registeredProtocols.add(protocol);
         return ResponseEntity.status(HttpStatus.ACCEPTED).body(Map.of("protocolo", protocol));
     }
 
@@ -140,8 +148,19 @@ public class MockCentralController {
     }
 
     @GetMapping("/operacoes-portabilidade/{protocol}")
-    public ResponseEntity<Void> getStatus(@PathVariable String protocol) {
-        return ResponseEntity.status(HttpStatus.NOT_IMPLEMENTED).build();
+    public ResponseEntity<?> getStatus(@PathVariable String protocol) {
+        if (isBlank(protocol) || !registeredProtocols.contains(protocol)) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+        }
+        int consultations = statusConsultations.computeIfAbsent(protocol, key -> new AtomicInteger())
+                .incrementAndGet();
+        if (consultations <= 2) {
+            return ResponseEntity.noContent().header(HttpHeaders.RETRY_AFTER, "1").build();
+        }
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("status", "CONFIRMADA");
+        body.put("motivoRejeicao", null);
+        return ResponseEntity.ok(body);
     }
 
     private static boolean isBlank(String value) {

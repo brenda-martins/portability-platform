@@ -294,6 +294,45 @@ describe('App', () => {
     expect(await screen.findByText('Operação solicitada')).toBeTruthy();
   });
 
+  it('should refresh the operation status when consulting status', async () => {
+    respondByPath({
+      '/authorizations': authorization,
+      '/portability': operation,
+      '/portability/OPE-1': { ...operation, status: 'CONFIRMED' },
+    });
+    render(<App />);
+
+    await authorize();
+    fillOperationForm();
+    fireEvent.click(screen.getByRole('button', { name: /registrar portabilidade/i }));
+    await screen.findByText('PRT-1');
+    fireEvent.click(screen.getByRole('button', { name: /consultar status/i }));
+
+    expect(await screen.findByText('CONFIRMED')).toBeTruthy();
+    expect(mockedApiFetch).toHaveBeenCalledWith('/portability/OPE-1');
+  });
+
+  it('should display the rejection reason returned by the status consultation', async () => {
+    respondByPath({
+      '/authorizations': authorization,
+      '/portability': operation,
+      '/portability/OPE-1': {
+        ...operation,
+        status: 'REJECTED',
+        rejectionReason: 'Convênio bloqueado',
+      },
+    });
+    render(<App />);
+
+    await authorize();
+    fillOperationForm();
+    fireEvent.click(screen.getByRole('button', { name: /registrar portabilidade/i }));
+    await screen.findByText('PRT-1');
+    fireEvent.click(screen.getByRole('button', { name: /consultar status/i }));
+
+    expect(await screen.findByText(/motivo da rejeição: convênio bloqueado/i)).toBeTruthy();
+  });
+
   it('should display an empty state when the audit has no events', async () => {
     mockedApiFetch.mockImplementation(async (path) => {
       if (path === '/authorizations') return authorization as never;

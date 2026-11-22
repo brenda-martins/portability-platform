@@ -175,9 +175,14 @@ Ver [`AGENTS.md`](AGENTS.md), seção "Agentes e skills".
 | `POST` | `/api/authorizations` | `201`, `200` (reenvio), `400`, `502` | Registrar opt-in do beneficiário |
 | `GET` | `/api/beneficiaries/{beneficiaryId}/agenda` | `200`, `400`, `403`, `502` | Listar parcelas da agenda de beneficiário autorizado |
 | `POST` | `/api/portability` | `201`, `200` (reenvio), `400`, `403`, `502` | Registrar operação de portabilidade com conta de recebimento |
-| `GET` | `/api/portability/{operationId}` | `404` | Consultar status da operação |
+| `GET` | `/api/portability/{operationId}` | `200`, `404`, `502` | Consultar status da operação (acompanha a confirmação na Central) |
 | `GET` | `/api/portability/{operationId}/audit` | `404` | Consultar trilha de eventos |
 
+`GET /api/portability/{operationId}` consulta a Central enquanto a operação está `PENDING`, respeitando
+`Retry-After` com backoff (política em [`docs/lld.md`](docs/lld.md), seção "Integração, idempotência e
+erros"). A resposta é sempre a operação com o status mais recente; se a confirmação não chegar dentro das
+tentativas, o status continua `PENDING` e uma nova consulta retoma o acompanhamento. Operação já
+`CONFIRMED` ou `REJECTED` não consulta a Central.
 
 ### Central de Convênios simulada (`/central`)
 
@@ -187,7 +192,7 @@ Ver [`AGENTS.md`](AGENTS.md), seção "Agentes e skills".
 | `POST` | `/central/autorizacoes` | `201`, `400`, `401` | Registrar autorização; `201` devolve `{ "autorizacaoId": "..." }` |
 | `GET` | `/central/beneficiarios/{beneficiaryId}/agenda` | `200` | Listar parcelas (fixture fixa por beneficiário) |
 | `POST` | `/central/operacoes-portabilidade` | `202`, `400`, `401` | Registrar operação; `202` devolve `{ "protocolo": "..." }` |
-| `GET` | `/central/operacoes-portabilidade/{protocol}` | `501` | Consultar status ou `204` + `Retry-After` enquanto pendente |
+| `GET` | `/central/operacoes-portabilidade/{protocol}` | `204` + `Retry-After`, `200`, `404` | Consultar status da operação (mock: pendente nas duas primeiras consultas) |
 
 `POST /central/autorizacoes` exige o cabeçalho `X-Signature`: HMAC-SHA256 em Base64 do corpo exato da
 requisição, calculado com `central.hmac-secret` (`CENTRAL_HMAC_SECRET`). Assinatura ausente ou inválida
@@ -197,6 +202,10 @@ responde `401`; payload com campos em branco responde `400`.
 **sem** o campo `assinatura` (o valor calculado é gravado nesse campo e no cabeçalho). O protocolo do mock
 é `PRT-` seguido de um UUID determinístico derivado do corpo canônico, portanto o mesmo payload devolve o
 mesmo protocolo. Assinatura ausente/inválida responde `401` e payload inválido responde `400`.
+
+`GET /central/operacoes-portabilidade/{protocolo}` não exige assinatura nem corpo. No mock, as duas
+primeiras consultas a um protocolo respondem `204` com `Retry-After: 1`; a partir da terceira, respondem
+`200` com `CONFIRMADA`. Protocolo desconhecido responde `404`.
 
 Payloads da Central (pt-BR, conforme o PDF):
 

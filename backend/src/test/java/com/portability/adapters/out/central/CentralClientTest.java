@@ -1,7 +1,9 @@
 package com.portability.adapters.out.central;
 
+import com.portability.domain.model.CentralOperationStatus;
 import com.portability.domain.model.DiscountInstallment;
 import com.portability.domain.model.InstallmentStatus;
+import com.portability.domain.model.OperationStatus;
 import com.portability.domain.model.ReceivingAccount;
 import com.portability.domain.ports.out.CentralUnavailableException;
 import com.sun.net.httpserver.HttpServer;
@@ -15,10 +17,12 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class CentralClientTest {
@@ -36,6 +40,11 @@ class CentralClientTest {
     private String agendaBody;
     private int operationStatus;
     private String operationBody;
+    private int statusCode;
+    private String statusBody;
+    private String statusRetryAfter;
+    private String statusPath;
+    private String statusSignature;
 
     @BeforeEach
     void setUp() throws IOException {
@@ -47,6 +56,9 @@ class CentralClientTest {
                 + "\"dataDesconto\":\"2099-01-10\",\"status\":\"ABERTA\"}]";
         operationStatus = 202;
         operationBody = "{\"protocolo\":\"PRT-1\"}";
+        statusCode = 204;
+        statusBody = "";
+        statusRetryAfter = "1";
         server = HttpServer.create(new InetSocketAddress(0), 0);
         server.createContext("/central/autorizacoes", exchange -> {
             receivedBody = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
@@ -65,6 +77,21 @@ class CentralClientTest {
             exchange.close();
         });
         server.createContext("/central/operacoes-portabilidade", exchange -> {
+            if ("GET".equals(exchange.getRequestMethod())) {
+                statusPath = exchange.getRequestURI().getPath();
+                statusSignature = exchange.getRequestHeaders().getFirst("X-Signature");
+                exchange.getResponseHeaders().add("Retry-After", statusRetryAfter);
+                exchange.getResponseHeaders().add("Content-Type", "application/json");
+                if (statusCode == 204) {
+                    exchange.sendResponseHeaders(204, -1);
+                } else {
+                    byte[] response = statusBody.getBytes(StandardCharsets.UTF_8);
+                    exchange.sendResponseHeaders(statusCode, response.length);
+                    exchange.getResponseBody().write(response);
+                }
+                exchange.close();
+                return;
+            }
             receivedBody = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
             receivedSignature = exchange.getRequestHeaders().getFirst("X-Signature");
             byte[] response = operationBody.getBytes(StandardCharsets.UTF_8);
@@ -163,6 +190,64 @@ class CentralClientTest {
         assertThrows(CentralUnavailableException.class, () -> client.registerPortability(
                 "BEN-123", List.of("INS-1"), "Nova Credora S.A.",
                 new ReceivingAccount("001", "1234", "56789-0")));
+    }
+
+    @Test
+    void mustTranslatePendingStatusAndRetryAfterWithoutSendingSignature() {
+        statusCode = 204;
+        statusRetryAfter = "2";
+
+        CentralOperationStatus status = client.consultStatus("PRT-1");
+
+        assertEquals(OperationStatus.PENDING, status.status());
+        assertEquals(Duration.ofSeconds(2), status.retryAfter());
+        assertEquals("/central/operacoes-portabilidade/PRT-1", statusPath);
+        assertNull(statusSignature);
+    }
+
+    @Test
+    void mustTranslateConfirmedStatusFromCentral() {
+        statusCode = 200;
+        statusBody = "{\"status\":\"CONFIRMADA\",\"motivoRejeicao\":null}";
+
+        CentralOperationStatus status = client.consultStatus("PRT-1");
+
+        assertEquals(OperationStatus.CONFIRMED, status.status());
+        assertEquals(Duration.ZERO, status.retryAfter());
+    }
+
+    @Test
+    void mustTranslateRejectionReasonFromCentral() {
+        statusCode = 200;
+        statusBody = "{\"status\":\"REJEITADA\",\"motivoRejeicao\":\"Convênio bloqueado\"}";
+
+        CentralOperationStatus status = client.consultStatus("PRT-1");
+
+        assertEquals(OperationStatus.REJECTED, status.status());
+        assertEquals("Convênio bloqueado", status.rejectionReason());
+    }
+
+    @Test
+    void shouldFailWhenCentralStatusRespondsWithError() {
+        statusCode = 500;
+
+        assertThrows(CentralUnavailableException.class, () -> client.consultStatus("PRT-1"));
+    }
+
+    @Test
+    void shouldFailWhenCentralStatusIsUnknown() {
+        statusCode = 200;
+        statusBody = "{\"status\":\"DESCONHECIDO\",\"motivoRejeicao\":null}";
+
+        assertThrows(CentralUnavailableException.class, () -> client.consultStatus("PRT-1"));
+    }
+
+    @Test
+    void shouldFailWhenRetryAfterIsInvalid() {
+        statusCode = 204;
+        statusRetryAfter = "inválido";
+
+        assertThrows(CentralUnavailableException.class, () -> client.consultStatus("PRT-1"));
     }
 
     private static final String CANONICAL_PORTABILITY_BODY =

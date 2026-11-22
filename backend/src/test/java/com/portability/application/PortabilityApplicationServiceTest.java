@@ -4,6 +4,7 @@ import com.portability.domain.model.AuditEvent;
 import com.portability.domain.model.Authorization;
 import com.portability.domain.model.AuthorizationResult;
 import com.portability.domain.model.BeneficiaryNotAuthorizedException;
+import com.portability.domain.model.CentralOperationStatus;
 import com.portability.domain.model.DiscountInstallment;
 import com.portability.domain.model.InstallmentStatus;
 import com.portability.domain.model.OperationStatus;
@@ -12,6 +13,7 @@ import com.portability.domain.model.PortabilityOperationResult;
 import com.portability.domain.model.ReceivingAccount;
 import com.portability.domain.ports.out.AuditEventRepository;
 import com.portability.domain.ports.out.AuthorizationRepository;
+import com.portability.domain.ports.out.BackoffPort;
 import com.portability.domain.ports.out.CentralAuthorizationPort;
 import com.portability.domain.ports.out.CentralPortabilityPort;
 import com.portability.domain.ports.out.CentralUnavailableException;
@@ -26,6 +28,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
@@ -68,6 +71,8 @@ class PortabilityApplicationServiceTest {
     private CentralAuthorizationPort centralAuthorizationPort;
     @Mock
     private SignaturePort signaturePort;
+    @Mock
+    private BackoffPort backoffPort;
 
     @InjectMocks
     private PortabilityApplicationService service;
@@ -326,6 +331,109 @@ class PortabilityApplicationServiceTest {
         verifyNoInteractions(auditEventRepository);
     }
 
+    @Test
+    void mustPollCentralWithBackoffAndPersistConfirmedStatus() {
+        PortabilityOperation confirmed = operation("OPE-1", OperationStatus.CONFIRMED, null);
+        when(operationRepository.findById("OPE-1")).thenReturn(Optional.of(operation("OPE-1")));
+        when(centralPortabilityPort.consultStatus("PRT-OLD"))
+                .thenReturn(new CentralOperationStatus(OperationStatus.PENDING, null, Duration.ofSeconds(1)))
+                .thenReturn(new CentralOperationStatus(OperationStatus.PENDING, null, Duration.ofSeconds(1)))
+                .thenReturn(new CentralOperationStatus(OperationStatus.CONFIRMED, null, Duration.ZERO));
+        when(operationRepository.updateStatus("OPE-1", OperationStatus.CONFIRMED, null)).thenReturn(confirmed);
+        when(auditEventRepository.append(any(AuditEvent.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        Optional<PortabilityOperation> result = service.getOperationStatus("OPE-1");
+
+        assertTrue(result.isPresent());
+        assertSame(confirmed, result.get());
+        verify(centralPortabilityPort, times(3)).consultStatus("PRT-OLD");
+        ArgumentCaptor<Duration> delays = ArgumentCaptor.forClass(Duration.class);
+        verify(backoffPort, times(2)).await(delays.capture());
+        assertEquals(List.of(Duration.ofSeconds(1), Duration.ofSeconds(2)), delays.getAllValues());
+        verify(operationRepository).updateStatus("OPE-1", OperationStatus.CONFIRMED, null);
+        ArgumentCaptor<AuditEvent> event = ArgumentCaptor.forClass(AuditEvent.class);
+        verify(auditEventRepository).append(event.capture());
+        assertEquals("CONFIRMADA", event.getValue().eventType());
+        assertTrue(event.getValue().message().contains("PRT-OLD"));
+    }
+
+    @Test
+    void mustNotConsultCentralWhenOperationIsAlreadyFinal() {
+        PortabilityOperation confirmed = operation("OPE-1", OperationStatus.CONFIRMED, null);
+        when(operationRepository.findById("OPE-1")).thenReturn(Optional.of(confirmed));
+
+        Optional<PortabilityOperation> result = service.getOperationStatus("OPE-1");
+
+        assertTrue(result.isPresent());
+        assertSame(confirmed, result.get());
+        verifyNoInteractions(centralPortabilityPort, backoffPort, auditEventRepository);
+        verify(operationRepository, never()).updateStatus(anyString(), any(), any());
+    }
+
+    @Test
+    void mustPersistRejectionReasonAndEventWhenCentralRejects() {
+        PortabilityOperation rejected = operation("OPE-1", OperationStatus.REJECTED, "Convênio bloqueado");
+        when(operationRepository.findById("OPE-1")).thenReturn(Optional.of(operation("OPE-1")));
+        when(centralPortabilityPort.consultStatus("PRT-OLD"))
+                .thenReturn(new CentralOperationStatus(OperationStatus.REJECTED, "Convênio bloqueado",
+                        Duration.ZERO));
+        when(operationRepository.updateStatus("OPE-1", OperationStatus.REJECTED, "Convênio bloqueado"))
+                .thenReturn(rejected);
+        when(auditEventRepository.append(any(AuditEvent.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        Optional<PortabilityOperation> result = service.getOperationStatus("OPE-1");
+
+        assertTrue(result.isPresent());
+        assertEquals(OperationStatus.REJECTED, result.get().status());
+        assertEquals("Convênio bloqueado", result.get().rejectionReason());
+        verifyNoInteractions(backoffPort);
+        ArgumentCaptor<AuditEvent> event = ArgumentCaptor.forClass(AuditEvent.class);
+        verify(auditEventRepository).append(event.capture());
+        assertEquals("REJEITADA", event.getValue().eventType());
+        assertTrue(event.getValue().message().contains("Convênio bloqueado"));
+    }
+
+    @Test
+    void mustKeepOperationPendingWhenCentralNeverConfirms() {
+        when(operationRepository.findById("OPE-1")).thenReturn(Optional.of(operation("OPE-1")));
+        when(centralPortabilityPort.consultStatus("PRT-OLD"))
+                .thenReturn(new CentralOperationStatus(OperationStatus.PENDING, null, Duration.ofSeconds(3)));
+
+        Optional<PortabilityOperation> result = service.getOperationStatus("OPE-1");
+
+        assertTrue(result.isPresent());
+        assertEquals(OperationStatus.PENDING, result.get().status());
+        verify(centralPortabilityPort, times(3)).consultStatus("PRT-OLD");
+        ArgumentCaptor<Duration> delays = ArgumentCaptor.forClass(Duration.class);
+        verify(backoffPort, times(2)).await(delays.capture());
+        assertEquals(List.of(Duration.ofSeconds(3), Duration.ofSeconds(3)), delays.getAllValues());
+        verify(operationRepository, never()).updateStatus(anyString(), any(), any());
+        verifyNoInteractions(auditEventRepository);
+    }
+
+    @Test
+    void mustNotChangeOperationWhenCentralStatusConsultationFails() {
+        when(operationRepository.findById("OPE-1")).thenReturn(Optional.of(operation("OPE-1")));
+        when(centralPortabilityPort.consultStatus("PRT-OLD"))
+                .thenThrow(new CentralUnavailableException("Central indisponível"));
+
+        assertThrows(CentralUnavailableException.class, () -> service.getOperationStatus("OPE-1"));
+
+        verify(operationRepository, never()).updateStatus(anyString(), any(), any());
+        verifyNoInteractions(auditEventRepository, backoffPort);
+    }
+
+    @Test
+    void mustReturnEmptyWhenOperationDoesNotExist() {
+        when(operationRepository.findById("missing")).thenReturn(Optional.empty());
+
+        assertTrue(service.getOperationStatus("missing").isEmpty());
+
+        verifyNoInteractions(centralPortabilityPort, backoffPort, auditEventRepository);
+    }
+
     private void stubAuthorizationAndAgenda(List<DiscountInstallment> agenda) {
         when(operationRepository.findByIdempotencyKey(anyString())).thenReturn(Optional.empty());
         when(authorizationRepository.existsByBeneficiaryId(BENEFICIARY_ID)).thenReturn(true);
@@ -351,8 +459,13 @@ class PortabilityApplicationServiceTest {
     }
 
     private static PortabilityOperation operation(String operationId) {
+        return operation(operationId, OperationStatus.PENDING, null);
+    }
+
+    private static PortabilityOperation operation(String operationId, OperationStatus status,
+            String rejectionReason) {
         return new PortabilityOperation(operationId, BENEFICIARY_ID, List.of("INS-1"), CREDITOR,
-                account(), OperationStatus.PENDING, "PRT-OLD", null,
+                account(), status, "PRT-OLD", rejectionReason,
                 Instant.parse("2026-11-22T12:34:56Z"));
     }
 }

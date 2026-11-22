@@ -1,5 +1,6 @@
 package com.portability.adapters.out.persistence;
 
+import com.portability.domain.model.OperationStatus;
 import com.portability.domain.model.PortabilityOperation;
 import com.portability.domain.model.ReceivingAccount;
 import com.portability.domain.ports.out.OperationRepository;
@@ -44,14 +45,21 @@ public class OperationRepositoryAdapter implements OperationRepository {
 
     @Override
     public Optional<PortabilityOperation> findById(String operationId) {
-        // TODO: query and map to the domain model (F04).
-        throw new UnsupportedOperationException("TODO: find operation by id");
+        return repository.findById(operationId).map(OperationRepositoryAdapter::toDomain);
     }
 
     @Override
     public Optional<PortabilityOperation> findByProtocol(String protocol) {
-        // TODO: query and map to the domain model (F04).
-        throw new UnsupportedOperationException("TODO: find operation by protocol");
+        return repository.findByProtocol(protocol).map(OperationRepositoryAdapter::toDomain);
+    }
+
+    @Override
+    public PortabilityOperation updateStatus(String operationId, OperationStatus status, String rejectionReason) {
+        OperationJpaEntity entity = repository.findById(operationId)
+                .orElseThrow(() -> new IllegalArgumentException("Operação não encontrada: " + operationId));
+        entity.setStatus(status);
+        entity.setRejectionReason(rejectionReason);
+        return toDomain(repository.save(entity));
     }
 
     private static PortabilityOperation toDomain(OperationJpaEntity entity) {

@@ -4,6 +4,7 @@ import com.portability.domain.model.AuditEvent;
 import com.portability.domain.model.Authorization;
 import com.portability.domain.model.AuthorizationResult;
 import com.portability.domain.model.BeneficiaryNotAuthorizedException;
+import com.portability.domain.model.CentralOperationStatus;
 import com.portability.domain.model.DiscountInstallment;
 import com.portability.domain.model.InstallmentStatus;
 import com.portability.domain.model.OperationStatus;
@@ -17,6 +18,7 @@ import com.portability.domain.ports.in.RegisterAuthorizationUseCase;
 import com.portability.domain.ports.in.StartPortabilityUseCase;
 import com.portability.domain.ports.out.AuditEventRepository;
 import com.portability.domain.ports.out.AuthorizationRepository;
+import com.portability.domain.ports.out.BackoffPort;
 import com.portability.domain.ports.out.CentralAuthorizationPort;
 import com.portability.domain.ports.out.CentralPortabilityPort;
 import com.portability.domain.ports.out.DiscountAgendaPort;
@@ -27,6 +29,7 @@ import org.springframework.stereotype.Service;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.HashSet;
@@ -45,6 +48,10 @@ import java.util.stream.Collectors;
 public class PortabilityApplicationService implements RegisterAuthorizationUseCase, GetDiscountAgendaUseCase,
         StartPortabilityUseCase, GetOperationStatusUseCase, GetOperationAuditUseCase {
 
+    private static final int MAX_STATUS_ATTEMPTS = 3;
+    private static final Duration BASE_BACKOFF = Duration.ofSeconds(1);
+    private static final Duration MAX_BACKOFF = Duration.ofSeconds(5);
+
     private final AuthorizationRepository authorizationRepository;
     private final OperationRepository operationRepository;
     private final AuditEventRepository auditEventRepository;
@@ -52,6 +59,7 @@ public class PortabilityApplicationService implements RegisterAuthorizationUseCa
     private final CentralPortabilityPort centralPortabilityPort;
     private final CentralAuthorizationPort centralAuthorizationPort;
     private final SignaturePort signaturePort;
+    private final BackoffPort backoffPort;
 
     public PortabilityApplicationService(
             AuthorizationRepository authorizationRepository,
@@ -60,7 +68,8 @@ public class PortabilityApplicationService implements RegisterAuthorizationUseCa
             DiscountAgendaPort discountAgendaPort,
             CentralPortabilityPort centralPortabilityPort,
             CentralAuthorizationPort centralAuthorizationPort,
-            SignaturePort signaturePort) {
+            SignaturePort signaturePort,
+            BackoffPort backoffPort) {
         this.authorizationRepository = authorizationRepository;
         this.operationRepository = operationRepository;
         this.auditEventRepository = auditEventRepository;
@@ -68,6 +77,7 @@ public class PortabilityApplicationService implements RegisterAuthorizationUseCa
         this.centralPortabilityPort = centralPortabilityPort;
         this.centralAuthorizationPort = centralAuthorizationPort;
         this.signaturePort = signaturePort;
+        this.backoffPort = backoffPort;
     }
 
     @Override
@@ -142,9 +152,60 @@ public class PortabilityApplicationService implements RegisterAuthorizationUseCa
 
     @Override
     public Optional<PortabilityOperation> getOperationStatus(String operationId) {
-        // TODO: read local state and poll the Central when the operation is still
-        // pending.
-        throw new UnsupportedOperationException("TODO: getOperationStatus");
+        requireNotBlank(operationId, "operationId");
+        return operationRepository.findById(operationId).map(this::followStatus);
+    }
+
+    private PortabilityOperation followStatus(PortabilityOperation operation) {
+        if (operation.status() != OperationStatus.PENDING
+                || operation.protocol() == null || operation.protocol().isBlank()) {
+            return operation;
+        }
+
+        PortabilityOperation current = operation;
+        for (int attempt = 1; attempt <= MAX_STATUS_ATTEMPTS && current.status() == OperationStatus.PENDING;
+                attempt++) {
+            CentralOperationStatus central = centralPortabilityPort.consultStatus(current.protocol());
+            if (central.status() == OperationStatus.PENDING) {
+                if (attempt < MAX_STATUS_ATTEMPTS) {
+                    backoffPort.await(backoffDelay(attempt, central.retryAfter()));
+                }
+                continue;
+            }
+
+            PortabilityOperation updated = operationRepository.updateStatus(
+                    current.operationId(), central.status(), central.rejectionReason());
+            auditEventRepository.append(new AuditEvent(
+                    UUID.randomUUID().toString(),
+                    updated.operationId(),
+                    eventType(central.status()),
+                    statusMessage(central, current.protocol()),
+                    Instant.now()));
+            current = updated;
+        }
+        return current;
+    }
+
+    private static Duration backoffDelay(int attempt, Duration retryAfter) {
+        Duration exponential = BASE_BACKOFF.multipliedBy(1L << (attempt - 1));
+        Duration chosen = retryAfter == null || retryAfter.isZero() || retryAfter.isNegative()
+                || retryAfter.compareTo(exponential) < 0 ? exponential : retryAfter;
+        return chosen.compareTo(MAX_BACKOFF) > 0 ? MAX_BACKOFF : chosen;
+    }
+
+    private static String eventType(OperationStatus status) {
+        return switch (status) {
+            case CONFIRMED -> "CONFIRMADA";
+            case REJECTED -> "REJEITADA";
+            case PENDING -> "PENDENTE";
+        };
+    }
+
+    private static String statusMessage(CentralOperationStatus central, String protocol) {
+        if (central.status() == OperationStatus.REJECTED) {
+            return "Operação rejeitada pela Central: " + central.rejectionReason();
+        }
+        return "Operação confirmada pela Central com protocolo " + protocol;
     }
 
     @Override
