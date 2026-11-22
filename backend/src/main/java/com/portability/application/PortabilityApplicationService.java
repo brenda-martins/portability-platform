@@ -75,13 +75,11 @@ public class PortabilityApplicationService implements RegisterAuthorizationUseCa
         return new AuthorizationResult(authorizationRepository.save(authorization), true);
     }
 
-   
-
     @Override
     public List<DiscountInstallment> getAgenda(String beneficiaryId) {
         requireNotBlank(beneficiaryId, "beneficiaryId");
         if (!authorizationRepository.existsByBeneficiaryId(beneficiaryId)) {
-            throw new BeneficiaryNotAuthorizedException("Beneficiário não autorizado");
+            throw new BeneficiaryNotAuthorizedException("Beneficiary not authorized");
         }
         return discountAgendaPort.fetchAgenda(beneficiaryId);
     }
@@ -107,5 +105,11 @@ public class PortabilityApplicationService implements RegisterAuthorizationUseCa
     public List<AuditEvent> getAuditTrail(String operationId) {
         // TODO: return the immutable event trail ordered by occurrence time.
         throw new UnsupportedOperationException("TODO: getAuditTrail");
+    }
+
+    private static void requireNotBlank(String value, String field) {
+        if (value == null || value.isBlank()) {
+            throw new IllegalArgumentException(field + " must not be blank");
+        }
     }
 }
