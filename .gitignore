@@ -1,0 +1,10 @@
+.DS_Store
+*.log
+.idea/
+.vscode/
+
+# Build/local artifacts
+backend/target/
+frontend/node_modules/
+frontend/dist/
+.env.local
