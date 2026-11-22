@@ -76,6 +76,10 @@ A tradução acontece em `adapters/out/central`:
 - `AuditEventRepositoryAdapter.append` deve ser **append-only**: insert sem update/delete.
 - `findByProtocol` existe para suportar idempotência; a constraint de unicidade ainda será decidida junto
   com a implementação (ver `docs/roadmap.md`, F03).
+- O datasource padrão usa PostgreSQL (`jdbc:postgresql://localhost:5433/portability`) com
+  `ddl-auto: update`; o serviço é subido por `compose.yaml` na raiz, que publica a porta `5433` no host
+  para não colidir com uma instância local em `5432`.
+- O perfil `test` usa H2 em memória com `ddl-auto: create-drop`, para `mvn test` não depender de Docker.
 - O esquema físico atual está documentado no README, seção "Modelo de dados".
 
 ## Integração, idempotência e erros (a implementar)
@@ -94,7 +98,9 @@ A tradução acontece em `adapters/out/central`:
 
 Cenários obrigatórios e comandos estão no [`../AGENTS.md`](../AGENTS.md), seções "Diretrizes para
 testes" e "Verificação completa". Resumo: unitários de domínio/aplicação com fakes dos ports, `MockMvc`
-para contratos HTTP, Vitest + Testing Library para comportamento visível da UI.
+para contratos HTTP, Vitest + Testing Library para comportamento visível da UI. Hoje há 1 smoke test de
+contexto e 10 testes da UI (autorização, agenda, elegibilidade, registro, rejeição, auditoria e estados
+de erro/vazio), com `apiFetch` mockado e `afterEach(cleanup)` porque o Vitest roda sem `globals`.
 
 ## Pendências
 

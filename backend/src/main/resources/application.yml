@@ -2,17 +2,14 @@ spring:
   application:
     name: portability-backend
   datasource:
-    url: jdbc:h2:mem:portability;DB_CLOSE_DELAY=-1
-    driver-class-name: org.h2.Driver
-    username: sa
-    password: ""
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5433/portability}
+    driver-class-name: org.postgresql.Driver
+    username: ${DATABASE_USER:portability}
+    password: ${DATABASE_PASSWORD:portability}
   jpa:
     hibernate:
       ddl-auto: update
     open-in-view: false
-  h2:
-    console:
-      enabled: true
 
 server:
   port: 8080

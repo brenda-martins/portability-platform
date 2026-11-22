@@ -21,7 +21,7 @@ Em `docs/` ficam os documentos que definem o produto, a arquitetura e os detalhe
 Cada projeto tem o próprio `AGENTS.md`, com os comandos, as particularidades da stack e as práticas de
 código dele:
 
-- `backend/AGENTS.md`: Java 21, Spring Boot 4.2.0, Maven, H2.
+- `backend/AGENTS.md`: Java 21, Spring Boot 4.2.0, Maven, PostgreSQL (H2 nos testes).
 - `frontend/AGENTS.md`: React 19, TypeScript, Vite 6, Vitest.
 
 ### Onde cada informação mora
@@ -91,7 +91,7 @@ UI (React) --HTTP /api--> adapters/in/web --> domain/ports/in
                                           (persistência, Central, assinatura)
 ```
 
-- O **domínio não depende de nada**: nem Spring, nem JPA, nem HTTP, nem H2.
+- O **domínio não depende de nada**: nem Spring, nem JPA, nem HTTP, nem banco de dados.
 - `application` depende **apenas** de `domain` (modelo + ports de entrada e saída).
 - `adapters/in` dependem dos ports de entrada; `adapters/out` dependem dos ports de saída.
 - A Central mockada vive no backend, sob `/central`, seguindo o contrato do PDF. É um adapter, não um
@@ -108,6 +108,7 @@ portability-platform/
 ├── AGENTS.md                      # este arquivo (memória + registro do harness)
 ├── README.md                      # documentação pública do projeto
 ├── GLOSSARY.md                    # vocabulário do domínio
+├── compose.yaml                   # PostgreSQL local para desenvolvimento
 ├── .gitignore
 ├── docs/
 │   ├── product-brief.md
@@ -236,7 +237,8 @@ O status da funcionalidade mora no roadmap; o da tarefa, no campo `Status` do `t
   registro na seção "Tecnologias" do README.
 - Sem router, estado global, UI kit ou ORM alternativo sem aprovação explícita — o pedido foi "frontend
   de forma simplificada".
-- H2 em memória continua até decisão em contrário; dados não sobrevivem a restart.
+- PostgreSQL é o padrão da aplicação (`compose.yaml` na raiz); H2 fica apenas nos testes. Os dados do
+  Compose sobrevivem a restart do container.
 - O repositório Git existe: não reinicialize (`git init`), não reescreva histórico e não altere remotes
   sem solicitação.
 

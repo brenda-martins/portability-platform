@@ -24,6 +24,7 @@ trabalhada; a numeração é global, sequencial e não muda depois de atribuída
 | F05 | Atualizar a conta de recebimento após a confirmação | planejada | F04 |
 | F06 | Consultar a trilha de auditoria de cada operação | planejada | F01, F03 |
 | F07 | Tratar e exibir rejeições e falhas de integração com a Central | planejada | F03, F04 |
+| F08 | PostgreSQL local via Compose e interface dos fluxos contra `/api` | em andamento | F00 |
 
 ## Convenções de numeração
 
@@ -35,7 +36,8 @@ trabalhada; a numeração é global, sequencial e não muda depois de atribuída
 
 ## Próximas ações
 
-1. Abrir o PRD de F01 (skill `/prd`, quando disponível) e em seguida a spec.
-2. Derivar a primeira tarefa, escrever o plano e commitá-lo sozinho (commit de plano).
-3. Executar a tarefa com SDD (ver [`../AGENTS.md`](../AGENTS.md), seção "Processo obrigatório de SDD").
-4. Atualizar o status nesta tabela nos marcos descritos acima.
+1. Abrir o PR de F08 (T01 e T02 implementadas e verificadas) para marcá-la como concluída.
+2. Abrir o PRD de F01 (skill `/prd`, quando disponível) e em seguida a spec.
+3. Derivar a primeira tarefa, escrever o plano e commitá-lo sozinho (commit de plano).
+4. Executar a tarefa com SDD (ver [`../AGENTS.md`](../AGENTS.md), seção "Processo obrigatório de SDD").
+5. Atualizar o status nesta tabela nos marcos descritos acima.

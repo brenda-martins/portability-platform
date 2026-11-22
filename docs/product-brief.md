@@ -39,14 +39,16 @@ Requisitos não funcionais do MVP: HMAC simplificado, idempotência no registro,
 consulta de status, tratamento explícito de indisponibilidade/timeout/resposta inesperada, eventos de
 auditoria append-only e testes dos cenários críticos.
 
-**Estado atual:** o MVP está na fase de scaffold; nenhum dos seis fluxos possui regra de negócio
-implementada. O status por funcionalidade está em [`roadmap.md`](roadmap.md).
+**Estado atual:** o MVP segue sem regra de negócio implementada nos seis fluxos; a interface já
+exercita autorização, agenda, registro, status e auditoria contra os endpoints atuais, que permanecem
+como stubs. O status por funcionalidade está em [`roadmap.md`](roadmap.md).
 
 ## Fora de escopo
 
 - Central de Convênios real, certificado digital ou assinatura criptográfica completa.
 - Autenticação/autorização de usuários, multi-tenancy e gestão de permissões.
-- Banco de dados de produção, migrações, observabilidade e infraestrutura (Docker/CI) nesta etapa.
+- Banco de dados de produção, migrações, observabilidade e CI/CD nesta etapa; o Compose local sobe
+  apenas o PostgreSQL de desenvolvimento.
 - Design visual elaborado, Figma, i18n e aplicativo mobile.
 - Qualquer funcionalidade de negócio não listada nos seis fluxos acima.
 

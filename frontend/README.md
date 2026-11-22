@@ -1,8 +1,8 @@
 # frontend
 
 React 19 + TypeScript 5.9 + Vite 6, interface simplificada de tela única, sem router e sem biblioteca de
-estado. **Estado atual:** scaffold — os quatro painéis são placeholders; o panorama completo está em
-[`../README.md`](../README.md).
+estado. **Estado atual:** os quatro painéis estão implementados e ligados aos endpoints atuais (que
+ainda retornam `404`); o panorama completo está em [`../README.md`](../README.md).
 
 ## Documentos
 

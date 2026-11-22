@@ -5,11 +5,11 @@ a ser a nova credora de parcelas hoje devidas a outro credor. A integração com
 simulada cobre `opt-in`, agenda de descontos, registro da operação, confirmação assíncrona e trilha de
 auditoria.
 
-> **Estado atual:** estrutura inicial (scaffold) concluída. Camadas, ports, DTOs, entidades JPA e
-> placeholders de UI prontos; **nenhuma regra de negócio está implementada**. Casos de uso e adapters
-> lançam `UnsupportedOperationException`, os endpoints da Central retornam `501` e apenas
-> `GET /api/health` responde efetivamente. Status por funcionalidade:
-> [`docs/roadmap.md`](docs/roadmap.md).
+> **Estado atual:** estrutura concluída, com a interface dos quatro fluxos ligada aos endpoints atuais e
+> PostgreSQL local via Docker Compose; **nenhuma regra de negócio está implementada no backend**. Casos
+> de uso e adapters lançam `UnsupportedOperationException`, os endpoints de `/api` retornam `404` e os
+> da Central, `501`; apenas `GET /api/health` responde efetivamente. A UI exibe esses erros. Status por
+> funcionalidade: [`docs/roadmap.md`](docs/roadmap.md).
 
 Regras para agentes de IA: [`AGENTS.md`](AGENTS.md).
 
@@ -33,7 +33,7 @@ seção.
 | Linguagem / runtime | Java | 21 | Requisito do usuário; compatível com Spring Boot 4 |
 | Framework backend | Spring Boot (Web, Data JPA, Validation) | 4.2.0 | Requisito do usuário; ecossistema maduro para REST + JPA |
 | Build | Maven | 3.6.3+ | Exigido pelo Spring Boot 4; já disponível no ambiente |
-| Banco | H2 (em memória) | gerenciado pelo Boot | Execução sem infraestrutura externa; ideal para o scaffold |
+| Banco | PostgreSQL (Docker Compose) + H2 | 16-alpine / gerenciado pelo Boot | PostgreSQL é o padrão da aplicação; H2 fica só nos testes, sem exigir Docker para `mvn test` |
 | ORM | Hibernate / Spring Data JPA | gerenciado pelo Boot | Mapeamento dos ports de repositório com baixo código |
 | Frontend | React + TypeScript | 19 / 5.9 | Requisito do desafio; TS recomendado no PDF |
 | Build frontend | Vite + plugin-react | 6.4 / 4.7 | Dev server rápido e proxy `/api` nativo |
@@ -44,7 +44,8 @@ seção.
 | Spec | `pdftotext` (poppler) | opcional | Utilizado para ler o PDF do desafio |
 
 **Não incluído de propósito:** Lombok, Flyway/Liquibase, React Router, biblioteca de estado global,
-biblioteca de componentes, Docker/CI. Qualquer inclusão futura exige justificativa em
+biblioteca de componentes e CI/CD. O Compose existe apenas para o PostgreSQL de desenvolvimento;
+backend e frontend não são containerizados. Qualquer inclusão futura exige justificativa em
 [Decisões técnicas](#decisões-técnicas).
 
 ---
@@ -87,18 +88,27 @@ cd frontend
 npm ci
 cd ..
 
-# 3) Opcional: segredo HMAC para a integração simulada
+# 3) Subir o PostgreSQL (os testes usam H2 e não precisam dele)
+docker compose up -d postgres
+
+# 4) Opcional: segredo HMAC para a integração simulada
 export CENTRAL_HMAC_SECRET="dev-secret-change-me"
 ```
 
-Não é necessário banco externo, variável de ambiente obrigatória nem serviço adicional: a Central roda
-no próprio backend.
+A Central roda no próprio backend. Para derrubar o banco e remover o volume: `docker compose down -v`.
+Sem o Compose, `mvn test` continua funcionando (perfil `test` com H2), mas `mvn spring-boot:run` não
+consegue conectar ao banco.
 
 ### Variáveis de ambiente
 
 | Variável | Consumida por | Padrão | Descrição |
 | --- | --- | --- | --- |
 | `JAVA_HOME` | Maven / build | `21.0.3-tem` (precisa ser exportada) | Seleciona o JDK 21 |
+| `DATABASE_URL` | Backend | `jdbc:postgresql://localhost:5433/portability` | URL JDBC do datasource padrão |
+| `DATABASE_USER` | Backend e Compose | `portability` | Usuário do banco |
+| `DATABASE_PASSWORD` | Backend e Compose | `portability` | Senha do banco |
+| `DATABASE_NAME` | Compose | `portability` | Nome do banco criado no container |
+| `DATABASE_PORT` | Compose | `5433` | Porta publicada no host (a 5432 costuma estar ocupada por uma instância local) |
 | `CENTRAL_HMAC_SECRET` | Backend | `dev-secret-change-me` | Segredo usado por `HmacSignatureService` (via `application.yml`) |
 | `CENTRAL_BASE_URL` | Backend | `http://localhost:8080/central` | Relaxed binding de `central.base-url`; também configurável por `--central.base-url=...` |
 | `SERVER_PORT` | Backend | `8080` | Sobrescreve `server.port`; ao alterar, ajuste o proxy em `vite.config.ts` |
@@ -109,6 +119,8 @@ Não há arquivo `.env` versionado. Em desenvolvimento, `VITE_API_URL` pode ser 
 
 ### Backend
 
+Com o PostgreSQL no ar (`docker compose up -d postgres`):
+
 ```bash
 export JAVA_HOME="$HOME/.sdkman/candidates/java/21.0.3-tem"
 cd backend
@@ -118,8 +130,8 @@ mvn spring-boot:run
 - API: `http://localhost:8080`
 - Health check: `http://localhost:8080/api/health`
 - Central simulada: `http://localhost:8080/central`
-- Console H2: `http://localhost:8080/h2-console` — JDBC URL `jdbc:h2:mem:portability`, usuário `sa`,
-  senha vazia.
+- PostgreSQL: `localhost:5433`, banco/usuário/senha `portability` (padrões configuráveis pelas variáveis
+  acima; dentro do container a porta é `5432`).
 
 Para gerar o JAR: `mvn clean package` e `java -jar target/portability-backend-0.0.1-SNAPSHOT.jar`.
 
@@ -283,8 +295,9 @@ curl -X POST http://localhost:8080/api/authorizations \
 
 ## Modelo de dados
 
-O Hibernate cria as tabelas no startup (`spring.jpa.hibernate.ddl-auto: update`) em H2 memória
-(`jdbc:h2:mem:portability;DB_CLOSE_DELAY=-1`). Ainda não há seed, índices ou constraints de unicidade —
+O Hibernate cria as tabelas no startup (`spring.jpa.hibernate.ddl-auto: update`) no PostgreSQL
+(`jdbc:postgresql://localhost:5433/portability`, via Compose). Nos testes, o perfil `test` usa H2 em
+memória com `ddl-auto: create-drop`. Ainda não há seed, índices ou constraints de unicidade —
 idempotência não foi implementada. Mapeamentos de domínio em
 [`docs/lld.md`](docs/lld.md), seção "Persistência".
 
@@ -333,7 +346,7 @@ Eventos devem ser **append-only**: nunca atualizados nem apagados (regra a imple
 | --- | --- | --- |
 | Backend | Spring Boot 4.2.0 + Java 21 | Requisito do usuário; JDK 21 disponível via SDKMAN |
 | Estrutura | Hexagonal (`domain` + `application` + `adapters/in` + `adapters/out`) | Isola regras de framework, REST e banco; custo de mais arquivos e mapeamentos |
-| Persistência | H2 em memória com JPA | Zero config para o scaffold; dados não sobrevivem a restart |
+| Persistência | PostgreSQL local via Compose; H2 só nos testes | Banco externo verificável sem containerizar a app; testes rápidos e independentes de Docker; porta host `5433` evita colisão com instância local |
 | Central | Mock REST no próprio backend (`/central`) | Mantém apenas `backend/` e `frontend/` e um único comando de execução; acopla deploy da simulação ao da API |
 | Frontend | Vite 6 + React 19 + TypeScript 5.9, CSS puro, sem router | Pedido de "forma simplificada"; se o fluxo crescer, avaliar React Router e TanStack Query |
 | Idioma | Código/contrato `/api` em inglês; contrato da Central em pt-BR | Nomes de pastas em inglês pedidos pelo usuário; PDF usa pt-BR na Central |
@@ -348,12 +361,15 @@ Eventos devem ser **append-only**: nunca atualizados nem apagados (regra a imple
 
 - Nenhuma regra de negócio está implementada: use cases, repositórios, cliente da Central e assinatura
   são stubs; os endpoints de negócio da API retornam `404` e os da Central, `501`.
-- A UI apenas exibe os quatro painéis; não há formulários, chamadas à API nem exibição de erros.
-- H2 é volátil e não há migrações de schema; `ddl-auto: update` é adequado apenas ao scaffold.
+- A UI tem formulários, seleção de parcelas, status e auditoria, mas como os endpoints de negócio
+  retornam `404`, o fluxo não avança sem o backend: os erros são exibidos nos painéis.
+- O schema é gerado por `ddl-auto: update` (PostgreSQL) / `create-drop` (H2 nos testes); não há
+  migrações versionadas e os dados do Compose sobrevivem a restart do container.
 - Não há autenticação/autorização, nem validação real de entrada, nem `@ControllerAdvice` para erros.
 - Idempotência, HMAC efetivo, retry/backoff, timeouts e auditoria append-only ainda não existem.
 - A propriedade `central.mock.enabled` está declarada, mas ainda não é usada para ligar/desligar o mock.
-- Não há CI/CD, Docker, seed de dados, paginação, versionamento de API nem testes de contrato.
+- Não há CI/CD, containerização do backend/frontend, seed de dados, paginação, versionamento de API
+  nem testes de contrato HTTP.
 - A central "real" é uma simulação local; o contrato do PDF é um ponto de partida, não uma spec fechada.
 - O repositório ainda não foi publicado (a entrega final do PDF pede um link público).
 

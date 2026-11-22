@@ -6,60 +6,63 @@
 
 ## Situação atual
 
-A interface é simplificada: uma única tela, CSS puro, sem biblioteca de componentes e sem Figma nesta
-etapa. Os estilos hoje moram em `frontend/src/index.css`. Este documento registra o que já existe e o que
-deve ser introduzido quando os painéis deixarem de ser placeholders.
+Interface simplificada: uma única tela, CSS puro, sem biblioteca de componentes e sem Figma. Os quatro
+painéis estão implementados em `frontend/src/features/` e estilizados em `frontend/src/index.css`.
+Falhas da API são exibidas no painel afetado; não há "sucesso falso".
 
 ## Tokens
 
-Os valores abaixo são os que já estão aplicados no CSS. A evolução prevista é movê-los para custom
-properties em `:root` (`--color-*`, `--space-*`, `--radius-*`) para evitar valores repetidos.
+Tokens como custom properties em `:root`, em `frontend/src/index.css`:
 
 | Categoria | Token | Valor | Uso |
 | --- | --- | --- | --- |
-| Cor | `text` | `#1f2937` | Texto principal |
-| Cor | `surface` | `#ffffff` | Fundo dos painéis |
-| Cor | `canvas` | `#f8fafc` | Fundo da página |
-| Cor | `muted` | `#64748b` | Subtítulos e textos secundários |
-| Cor | `placeholder` | `#94a3b8` | Texto de estado "a implementar" |
-| Cor | `border` | `#e2e8f0` | Bordas dos painéis |
+| Cor | `--color-text` | `#1f2937` | Texto principal |
+| Cor | `--color-surface` | `#ffffff` | Fundo dos painéis e texto sobre botões |
+| Cor | `--color-canvas` | `#f8fafc` | Fundo da página |
+| Cor | `--color-muted` | `#64748b` | Subtítulos, dicas e textos secundários |
+| Cor | `--color-border` | `#e2e8f0` | Bordas de painéis, campos e tabelas |
+| Cor | `--color-accent` | `#2563eb` | Botões e contorno de foco |
+| Cor | `--color-danger` / `--color-danger-surface` | `#b91c1c` / `#fef2f2` | Alertas e rejeição |
+| Cor | `--color-success` / `--color-success-surface` | `#166534` / `#f0fdf4` | Status e confirmação |
 | Tipografia | `font-family` | `system-ui, -apple-system, 'Segoe UI', sans-serif` | Toda a interface |
 | Tipografia | `title` | `1.1rem` | Título dos painéis (`h2`) |
-| Espaçamento | `xs` / `sm` / `md` / `lg` | `0.25rem` / `1rem` / `1.25–1.5rem` / `2rem` | Margens e paddings |
-| Raio | `radius` | `8px` | Cantos dos painéis |
+| Espaçamento | `--space-xs` / `--space-sm` / `--space-md` / `--space-lg` | `0.25rem` / `1rem` / `1.25rem` / `2rem` | Margens e paddings |
+| Raio | `--radius` | `8px` | Cantos dos painéis |
 | Sombra | — | nenhuma | Visual limpo, sem elevação |
 
 ## Componentes
 
-| Componente | Classe | Estado atual | Uso previsto |
+| Componente | Classe | Estado | Uso |
 | --- | --- | --- | --- |
 | Container da aplicação | `.app` | Implementado | Limita a largura a `900px` e centraliza o conteúdo |
 | Cabeçalho | `.app-header` | Implementado | Título e descrição do produto |
 | Grade principal | `.app-main` | Implementado | Empilha os quatro painéis com gap de `1rem` |
 | Painel | `.panel` | Implementado | Uma etapa do fluxo; fundo claro, borda e raio |
-| Placeholder | `.placeholder` | Implementado | Texto itálico sinalizando funcionalidade pendente |
-| Botão | `.button` | A criar | Ações com `type` explícito e estado de carregamento |
-| Campo de formulário | `.field` | A criar | `label` associado, mensagem de erro e ajuda |
-| Tabela de parcelas | `.installments` | A criar | Seleção de parcelas elegíveis |
-| Badge de status | `.status` | A criar | `PENDING` / `CONFIRMED` / `REJECTED` com cor e texto |
-| Alerta | `.alert` | A criar | Rejeição e falhas de integração |
+| Campo de formulário | `.field` | Implementado | `label` associado ao `input` |
+| Botão | `.button` | Implementado | Ações com `type` explícito e `disabled` real |
+| Ações do formulário | `.form-actions` | Implementado | Alinha botões e texto de carregamento |
+| Dica / estado vazio | `.hint` | Implementado | Texto secundário, carregamento e listas vazias |
+| Tabela de parcelas | `.installments` | Implementado | Seleção de parcelas elegíveis |
+| Badge de status | `.status` / `.status--rejected` | Implementado | Status da operação e confirmação de autorização |
+| Alerta | `.alert` | Implementado | Rejeição e falhas de API, com `role="alert"` |
+| Lista de eventos | `.event-list` / `.event-type` | Implementado | Trilha de auditoria ordenada por data |
 
 ## Estados de interação
 
 - **Padrão:** borda e texto conforme tokens acima.
-- **Hover:** leve escurecimento da borda em elementos clicáveis.
+- **Hover:** leve escurecimento do botão; as bordas dos demais elementos permanecem estáveis.
 - **Focus:** contorno visível (`:focus-visible`) obrigatório em inputs e botões; nunca remover sem substituto.
 - **Desabilitado:** opacidade reduzida e `disabled` real no elemento, não apenas aparência.
-- **Carregamento:** desabilitar a ação e exibir texto ("Carregando…") junto ao botão/painel.
+- **Carregamento:** desabilitar a ação e exibir "Carregando…" junto ao botão/painel.
 - **Erro:** mensagem legível no painel afetado, com o motivo da falha; nunca apenas `console.error`.
 - **Vazio:** texto explicativo quando a agenda ou a trilha não tiver itens.
 
 ## Responsividade
 
-- Layout atual: largura máxima de `900px`, padding `2rem 1rem 4rem`, grade com `gap: 1rem`.
+- Layout: largura máxima de `900px`, padding `2rem 1rem 4rem`, grade com `gap: 1rem`.
 - Em telas estreitas, manter o padding lateral de `1rem` e empilhar os painéis (comportamento já
   obtido pela grade).
-- Pontos de quebra, tabelas roláveis e ajustes de fonte serão definidos quando houver conteúdo real.
+- Abaixo de `600px`, a tabela de parcelas rola horizontalmente.
 
 ## Fluxo de trabalho com Figma
 

@@ -1,6 +1,7 @@
 # AGENTS.md — backend
 
-Projeto: `backend/` — Java 21 + Spring Boot 4.2.0 + Maven + H2, arquitetura hexagonal.
+Projeto: `backend/` — Java 21 + Spring Boot 4.2.0 + Maven + PostgreSQL (H2 nos testes), arquitetura
+hexagonal.
 
 ## Documentos de referência
 
@@ -22,7 +23,9 @@ mvn clean package     # gera target/portability-backend-0.0.1-SNAPSHOT.jar
 ```
 
 O Java padrão do ambiente é 17: **sempre** exportar `JAVA_HOME` para o JDK 21 antes de usar o Maven.
-Não há Docker neste projeto; rode o Maven diretamente na máquina.
+O backend não é containerizado: rode o Maven diretamente na máquina. O PostgreSQL de desenvolvimento
+sobe com `docker compose up -d postgres` a partir da raiz do repositório; `mvn test` usa H2 e não
+depende do Compose.
 
 ## Práticas específicas
 

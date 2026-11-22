@@ -15,7 +15,7 @@ flowchart LR
     API["Backend (Spring Boot)<br/>API /api"]
     Domain["Domínio + aplicação<br/>ports e casos de uso"]
     Adapters["Adapters de saída<br/>JPA e integração"]
-    DB[("H2 em memória")]
+    DB[("PostgreSQL<br/>Docker Compose")]
     Central["Central de Convênios<br/>mock em /central"]
 
     Beneficiario --> UI
@@ -30,11 +30,11 @@ flowchart LR
 
 | Camada | Responsabilidade | Não faz |
 | --- | --- | --- |
-| Frontend (`frontend/`) | Apresentar os quatro painéis, coletar entradas e exibir erros | Regras de negócio, acesso direto a banco/API fora do `client.ts` |
+| Frontend (`frontend/`) | Apresentar os quatro painéis, coletar entradas, selecionar parcelas, exibir status/auditoria e erros | Regras de negócio, acesso direto a banco/API fora do `client.ts` |
 | `adapters/in/web` | Receber HTTP, validar entrada e traduzir para casos de uso | Regras de domínio, acesso a repositórios |
 | `application` | Orquestrar casos de uso usando ports | Conhecer HTTP, JPA ou a Central |
 | `domain` | Modelo, invariantes e contratos (ports) | Depender de framework |
-| `adapters/out/persistence` | Persistir em H2 via JPA e mapear para o domínio | Definir regras de negócio |
+| `adapters/out/persistence` | Persistir em PostgreSQL via JPA e mapear para o domínio | Definir regras de negócio |
 | `adapters/out/central` | Falhar com a Central, assinar/verificar e traduzir o contrato | Expor tipos da Central ao domínio |
 
 A regra de dependência é sempre **para o domínio**. A Central simulada é um adapter interno, não um

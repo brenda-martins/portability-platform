@@ -1,0 +1,20 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: portability-postgres
+    environment:
+      POSTGRES_DB: ${DATABASE_NAME:-portability}
+      POSTGRES_USER: ${DATABASE_USER:-portability}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-portability}
+    ports:
+      - "${DATABASE_PORT:-5433}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DATABASE_USER:-portability} -d ${DATABASE_NAME:-portability}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  postgres-data:
