@@ -323,7 +323,6 @@ a tarefa tocou. Uma tarefa que cria um comando que a verificação deve rodar (u
 o acrescenta a esta seção e ao `AGENTS.md` do projeto correspondente.
 
 ```bash
-export JAVA_HOME="$HOME/.sdkman/candidates/java/21.0.3-tem"
 (cd backend && mvn test)
 (cd frontend && npm test && npm run build)
 ```

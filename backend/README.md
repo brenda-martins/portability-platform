@@ -14,8 +14,8 @@ A lista de documentos e o dono de cada informação estão em [`../AGENTS.md`](.
 
 ## Execução
 
-Comandos (inclusive a exportação de `JAVA_HOME` para o JDK 21) e pré-requisitos:
-[`AGENTS.md`](AGENTS.md). Suba o PostgreSQL com `docker compose up -d postgres` na raiz antes de
+Comandos e pré-requisitos (Java 21): [`AGENTS.md`](AGENTS.md). Suba o PostgreSQL com
+`docker compose up -d postgres` na raiz antes de
 `mvn spring-boot:run`; `mvn test` usa H2. Configuração, variáveis de ambiente, portas e contratos:
 [`../README.md`](../README.md), seções "Configuração do ambiente", "Variáveis de ambiente" e
 "Documentação da API".

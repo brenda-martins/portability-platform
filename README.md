@@ -61,15 +61,14 @@ diretórios".
 
 ## Execução
 
-Execute Maven e npm diretamente na máquina: o Java padrão do ambiente é 17, portanto exporte
-`JAVA_HOME` para o JDK 21 antes de qualquer comando Maven. Práticas específicas em
+Execute Maven e npm diretamente na máquina, com Java 21 instalado. Práticas específicas em
 [`backend/AGENTS.md`](backend/AGENTS.md) e [`frontend/AGENTS.md`](frontend/AGENTS.md).
 
 ### Pré-requisitos
 
 | Ferramenta | Versão mínima/prevista | Verificação |
 | --- | --- | --- |
-| JDK 21 | 21.0.3-tem (SDKMAN) | `java -version` com `JAVA_HOME` ajustado |
+| JDK | 21 | `java -version` |
 | Maven | 3.6.3 | `mvn -version` |
 | Node.js | 20.11.1 | `node --version` |
 | npm | 10.2.4 | `npm --version` |
@@ -78,20 +77,15 @@ Execute Maven e npm diretamente na máquina: o Java padrão do ambiente é 17, p
 ### Configuração do ambiente
 
 ```bash
-# 1) Selecionar o JDK 21
-export JAVA_HOME="$HOME/.sdkman/candidates/java/21.0.3-tem"
-export PATH="$JAVA_HOME/bin:$PATH"
-java -version    # deve mostrar 21.x
-
-# 2) Instalar as dependências do frontend (uma vez)
+# 1) Instalar as dependências do frontend (uma vez)
 cd frontend
 npm ci
 cd ..
 
-# 3) Subir o PostgreSQL (os testes usam H2 e não precisam dele)
+# 2) Subir o PostgreSQL (os testes usam H2 e não precisam dele)
 docker compose up -d postgres
 
-# 4) Opcional: segredo HMAC para a integração simulada
+# 3) Opcional: segredo HMAC para a integração simulada
 export CENTRAL_HMAC_SECRET="dev-secret-change-me"
 ```
 
@@ -103,7 +97,6 @@ consegue conectar ao banco.
 
 | Variável | Consumida por | Padrão | Descrição |
 | --- | --- | --- | --- |
-| `JAVA_HOME` | Maven / build | `21.0.3-tem` (precisa ser exportada) | Seleciona o JDK 21 |
 | `DATABASE_URL` | Backend | `jdbc:postgresql://localhost:5433/portability` | URL JDBC do datasource padrão |
 | `DATABASE_USER` | Backend e Compose | `portability` | Usuário do banco |
 | `DATABASE_PASSWORD` | Backend e Compose | `portability` | Senha do banco |
@@ -122,7 +115,6 @@ Não há arquivo `.env` versionado. Em desenvolvimento, `VITE_API_URL` pode ser 
 Com o PostgreSQL no ar (`docker compose up -d postgres`):
 
 ```bash
-export JAVA_HOME="$HOME/.sdkman/candidates/java/21.0.3-tem"
 cd backend
 mvn spring-boot:run
 ```
@@ -344,7 +336,7 @@ Eventos devem ser **append-only**: nunca atualizados nem apagados (regra a imple
 
 | Decisão | Escolha | Motivo / trade-off |
 | --- | --- | --- |
-| Backend | Spring Boot 4.2.0 + Java 21 | Requisito do usuário; JDK 21 disponível via SDKMAN |
+| Backend | Spring Boot 4.2.0 + Java 21 | Requisito do usuário; compatível com Spring Boot 4 |
 | Estrutura | Hexagonal (`domain` + `application` + `adapters/in` + `adapters/out`) | Isola regras de framework, REST e banco; custo de mais arquivos e mapeamentos |
 | Persistência | PostgreSQL local via Compose; H2 só nos testes | Banco externo verificável sem containerizar a app; testes rápidos e independentes de Docker; porta host `5433` evita colisão com instância local |
 | Central | Mock REST no próprio backend (`/central`) | Mantém apenas `backend/` e `frontend/` e um único comando de execução; acopla deploy da simulação ao da API |

@@ -14,18 +14,14 @@ hexagonal.
 ## Stack e comandos
 
 ```bash
-export JAVA_HOME="$HOME/.sdkman/candidates/java/21.0.3-tem"
-export PATH="$JAVA_HOME/bin:$PATH"
-
 mvn spring-boot:run   # API em http://localhost:8080
 mvn test              # smoke test do contexto
 mvn clean package     # gera target/portability-backend-0.0.1-SNAPSHOT.jar
 ```
 
-O Java padrão do ambiente é 17: **sempre** exportar `JAVA_HOME` para o JDK 21 antes de usar o Maven.
-O backend não é containerizado: rode o Maven diretamente na máquina. O PostgreSQL de desenvolvimento
-sobe com `docker compose up -d postgres` a partir da raiz do repositório; `mvn test` usa H2 e não
-depende do Compose.
+Requer JDK 21 (`java -version`). O backend não é containerizado: rode o Maven diretamente na máquina.
+O PostgreSQL de desenvolvimento sobe com `docker compose up -d postgres` a partir da raiz do
+repositório; `mvn test` usa H2 e não depende do Compose.
 
 ## Práticas específicas
 
@@ -42,7 +38,6 @@ depende do Compose.
 Rodar antes de abrir um PR de uma tarefa que tocou o backend:
 
 ```bash
-export JAVA_HOME="$HOME/.sdkman/candidates/java/21.0.3-tem"
 (cd backend && mvn test)
 ```
 
