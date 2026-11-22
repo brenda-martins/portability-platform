@@ -1,12 +1,14 @@
 package com.portability.adapters.in.web;
 
 import com.portability.domain.model.BeneficiaryNotAuthorizedException;
+import com.portability.domain.model.OperationNotConfirmedException;
 import com.portability.domain.model.OperationStatus;
 import com.portability.domain.model.PortabilityOperation;
 import com.portability.domain.model.PortabilityOperationResult;
 import com.portability.domain.model.ReceivingAccount;
 import com.portability.domain.ports.in.GetOperationStatusUseCase;
 import com.portability.domain.ports.in.StartPortabilityUseCase;
+import com.portability.domain.ports.in.UpdateReceivingAccountUseCase;
 import com.portability.domain.ports.out.CentralUnavailableException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -24,6 +26,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -34,18 +37,23 @@ class PortabilityControllerContractTest {
                     + "\"creditorAssignee\":\"Nova Credora S.A.\","
                     + "\"receivingAccount\":{\"bank\":\"001\",\"agency\":\"1234\",\"account\":\"56789-0\"}}";
 
+    private static final String ACCOUNT_BODY =
+            "{\"bank\":\"002\",\"agency\":\"4321\",\"account\":\"98765-4\"}";
+
     private StartPortabilityUseCase startPortabilityUseCase;
     private GetOperationStatusUseCase getOperationStatusUseCase;
+    private UpdateReceivingAccountUseCase updateReceivingAccountUseCase;
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp() {
         startPortabilityUseCase = mock(StartPortabilityUseCase.class);
         getOperationStatusUseCase = mock(GetOperationStatusUseCase.class);
+        updateReceivingAccountUseCase = mock(UpdateReceivingAccountUseCase.class);
         LocalValidatorFactoryBean validator = new LocalValidatorFactoryBean();
         validator.afterPropertiesSet();
-        mockMvc = MockMvcBuilders.standaloneSetup(
-                new PortabilityController(startPortabilityUseCase, getOperationStatusUseCase))
+        mockMvc = MockMvcBuilders.standaloneSetup(new PortabilityController(
+                startPortabilityUseCase, getOperationStatusUseCase, updateReceivingAccountUseCase))
                 .setControllerAdvice(new ApiExceptionHandler())
                 .setValidator(validator)
                 .build();
@@ -163,6 +171,75 @@ class PortabilityControllerContractTest {
                 .thenThrow(new CentralUnavailableException("Central indisponível"));
 
         mockMvc.perform(get("/api/portability/OPE-1"))
+                .andExpect(status().isBadGateway())
+                .andExpect(jsonPath("$.message").value("Central indisponível"));
+    }
+
+    @Test
+    void shouldRespond200WithUpdatedAccountWhenOperationIsConfirmed() throws Exception {
+        ReceivingAccount newAccount = new ReceivingAccount("002", "4321", "98765-4");
+        PortabilityOperation updated = new PortabilityOperation("OPE-1", "BEN-123", List.of("INS-1"),
+                "Nova Credora S.A.", newAccount, OperationStatus.CONFIRMED, "PRT-1", null,
+                Instant.parse("2026-11-22T12:34:56Z"));
+        when(updateReceivingAccountUseCase.updateReceivingAccount("OPE-1", newAccount))
+                .thenReturn(Optional.of(updated));
+
+        mockMvc.perform(put("/api/portability/OPE-1/receiving-account")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(ACCOUNT_BODY))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.operationId").value("OPE-1"))
+                .andExpect(jsonPath("$.receivingAccount.bank").value("002"))
+                .andExpect(jsonPath("$.receivingAccount.agency").value("4321"))
+                .andExpect(jsonPath("$.receivingAccount.account").value("98765-4"));
+    }
+
+    @Test
+    void shouldRespond400WhenUpdatedAccountIsBlank() throws Exception {
+        mockMvc.perform(put("/api/portability/OPE-1/receiving-account")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(ACCOUNT_BODY.replace("\"bank\":\"002\"", "\"bank\":\"\"")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").exists());
+
+        verifyNoInteractions(updateReceivingAccountUseCase);
+    }
+
+    @Test
+    void shouldRespond404WhenOperationToUpdateDoesNotExist() throws Exception {
+        when(updateReceivingAccountUseCase.updateReceivingAccount("missing",
+                new ReceivingAccount("002", "4321", "98765-4"))).thenReturn(Optional.empty());
+
+        mockMvc.perform(put("/api/portability/missing/receiving-account")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(ACCOUNT_BODY))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void mustRespond409WhenOperationIsNotConfirmed() throws Exception {
+        when(updateReceivingAccountUseCase.updateReceivingAccount("OPE-1",
+                new ReceivingAccount("002", "4321", "98765-4")))
+                .thenThrow(new OperationNotConfirmedException(
+                        "Somente operações confirmadas podem ter a conta alterada"));
+
+        mockMvc.perform(put("/api/portability/OPE-1/receiving-account")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(ACCOUNT_BODY))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message")
+                        .value("Somente operações confirmadas podem ter a conta alterada"));
+    }
+
+    @Test
+    void mustRespond502WhenCentralFailsDuringAccountUpdate() throws Exception {
+        when(updateReceivingAccountUseCase.updateReceivingAccount("OPE-1",
+                new ReceivingAccount("002", "4321", "98765-4")))
+                .thenThrow(new CentralUnavailableException("Central indisponível"));
+
+        mockMvc.perform(put("/api/portability/OPE-1/receiving-account")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(ACCOUNT_BODY))
                 .andExpect(status().isBadGateway())
                 .andExpect(jsonPath("$.message").value("Central indisponível"));
     }

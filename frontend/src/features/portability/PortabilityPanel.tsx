@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { apiFetch } from '../../api/client';
 import type { Authorization, PortabilityOperation } from '../../types';
 
@@ -19,8 +19,23 @@ export function PortabilityPanel({
   const [bank, setBank] = useState('');
   const [agency, setAgency] = useState('');
   const [account, setAccount] = useState('');
+  const [updateBank, setUpdateBank] = useState('');
+  const [updateAgency, setUpdateAgency] = useState('');
+  const [updateAccount, setUpdateAccount] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (operation?.receivingAccount) {
+      setUpdateBank(operation.receivingAccount.bank);
+      setUpdateAgency(operation.receivingAccount.agency);
+      setUpdateAccount(operation.receivingAccount.account);
+    }
+  }, [
+    operation?.receivingAccount?.bank,
+    operation?.receivingAccount?.agency,
+    operation?.receivingAccount?.account,
+  ]);
 
   async function handleRegister(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -41,6 +56,28 @@ export function PortabilityPanel({
       onOperationRegistered(result);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Não foi possível registrar a operação.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleUpdateAccount(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!operation) return;
+
+    setLoading(true);
+    setError(null);
+    try {
+      const result = await apiFetch<PortabilityOperation>(
+        `/portability/${operation.operationId}/receiving-account`,
+        {
+          method: 'PUT',
+          body: JSON.stringify({ bank: updateBank, agency: updateAgency, account: updateAccount }),
+        },
+      );
+      onOperationRegistered(result);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Não foi possível atualizar a conta.');
     } finally {
       setLoading(false);
     }
@@ -96,6 +133,42 @@ export function PortabilityPanel({
         </div>
       </form>
 
+      {operation?.status === 'CONFIRMED' && (
+        <form className="subform" onSubmit={handleUpdateAccount}>
+          <h3>Atualizar conta de recebimento</h3>
+          <div className="field">
+            <label htmlFor="update-bank">Novo banco</label>
+            <input
+              id="update-bank"
+              value={updateBank}
+              onChange={(event) => setUpdateBank(event.target.value)}
+            />
+          </div>
+          <div className="field">
+            <label htmlFor="update-agency">Nova agência</label>
+            <input
+              id="update-agency"
+              value={updateAgency}
+              onChange={(event) => setUpdateAgency(event.target.value)}
+            />
+          </div>
+          <div className="field">
+            <label htmlFor="update-account">Nova conta</label>
+            <input
+              id="update-account"
+              value={updateAccount}
+              onChange={(event) => setUpdateAccount(event.target.value)}
+            />
+          </div>
+          <div className="form-actions">
+            <button className="button" type="submit" disabled={loading}>
+              Atualizar conta
+            </button>
+            {loading && <span className="hint">Carregando…</span>}
+          </div>
+        </form>
+      )}
+
       {selectedInstallmentIds.length === 0 && <p className="hint">Selecione parcelas na agenda para registrar.</p>}
       {error && (
         <p className="alert" role="alert">
@@ -108,6 +181,15 @@ export function PortabilityPanel({
           <span className={`status${operation.status === 'REJECTED' ? ' status--rejected' : ''}`}>
             {operation.status}
           </span>
+        </p>
+      )}
+      {operation?.receivingAccount && (
+        <p>
+          Conta de recebimento:{' '}
+          <strong>
+            {operation.receivingAccount.bank} / {operation.receivingAccount.agency} /{' '}
+            {operation.receivingAccount.account}
+          </strong>
         </p>
       )}
       {operation?.protocol && (

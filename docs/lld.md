@@ -37,6 +37,7 @@ Enums: `OperationStatus` (`PENDING`, `CONFIRMED`, `REJECTED`), `InstallmentStatu
 | `GetDiscountAgendaUseCase` | `getAgenda(beneficiaryId): List<DiscountInstallment>` |
 | `StartPortabilityUseCase` | `startPortability(beneficiaryId, installmentIds, creditorAssignee, receivingAccount): PortabilityOperationResult` |
 | `GetOperationStatusUseCase` | `getOperationStatus(operationId): Optional<PortabilityOperation>` (acompanha a Central quando `PENDING`) |
+| `UpdateReceivingAccountUseCase` | `updateReceivingAccount(operationId, receivingAccount): Optional<PortabilityOperation>` |
 | `GetOperationAuditUseCase` | `getAuditTrail(operationId): List<AuditEvent>` |
 
 ### Saída (`domain/ports/out`)
@@ -45,14 +46,14 @@ Enums: `OperationStatus` (`PENDING`, `CONFIRMED`, `REJECTED`), `InstallmentStatu
 | --- | --- | --- |
 | `AuthorizationRepository` | `AuthorizationRepositoryAdapter` | salvar/buscar autorização por beneficiário e convênio; verificar existência por beneficiário |
 | `CentralAuthorizationPort` | `CentralClient` | montar payload/HMAC, registrar o opt-in na Central e devolver o `autorizacaoId` |
-| `OperationRepository` | `OperationRepositoryAdapter` | salvar, buscar por chave de idempotência, id e protocolo; atualizar status e motivo de rejeição |
+| `OperationRepository` | `OperationRepositoryAdapter` | salvar, buscar por chave de idempotência, id e protocolo; atualizar status/motivo de rejeição e conta de recebimento |
 | `AuditEventRepository` | `AuditEventRepositoryAdapter` | anexar eventos; listagem por operação é F06 |
 | `DiscountAgendaPort` | `CentralClient` | buscar agenda na Central (usada também para validar a seleção) |
-| `CentralPortabilityPort` | `CentralClient` | registrar operação assinada e consultar status assíncrono |
+| `CentralPortabilityPort` | `CentralClient` | registrar operação assinada, consultar status assíncrono e atualizar a conta de recebimento |
 | `SignaturePort` | `HmacSignatureService` | assinar e verificar mensagens |
 | `BackoffPort` | `ThreadBackoffAdapter` | aplicar a espera entre tentativas de consulta de status |
 
-`PortabilityApplicationService` implementa os cinco ports de entrada e depende apenas dos ports de saída.
+`PortabilityApplicationService` implementa os seis ports de entrada e depende apenas dos ports de saída.
 
 ## Mapeamento com a Central
 
@@ -81,8 +82,9 @@ A tradução acontece em `adapters/out/central`:
 - `OperationJpaEntity` usa `@ElementCollection` + `@OrderColumn` para `installmentIds` (tabela
   `operation_installments`, coluna `position`) e `idempotency_key` única para reconhecer reenvios.
 - `AuditEventRepositoryAdapter.append` é **append-only**: insert sem update/delete.
-- `findById`, `findByProtocol` e `updateStatus` estão implementados; `updateStatus` altera somente `status`
-  e `rejection_reason`. A listagem de eventos permanece stub (F06).
+- `findById`, `findByProtocol`, `updateStatus` e `updateReceivingAccount` estão implementados; `updateStatus`
+  altera somente `status` e `rejection_reason`, e `updateReceivingAccount` somente `bank`, `agency` e `account`.
+  A listagem de eventos permanece stub (F06).
 - O datasource padrão usa PostgreSQL (`jdbc:postgresql://localhost:5433/portability`) com
   `ddl-auto: update`; o serviço é subido por `compose.yaml` na raiz.
 - O perfil `test` usa H2 em memória com `ddl-auto: create-drop`.
@@ -129,8 +131,11 @@ A tradução acontece em `adapters/out/central`:
   falha da Central não grava operação nem evento.
 - Erros: falha de integração, timeout e resposta inesperada são traduzidos pelo adapter REST em respostas
   HTTP claras, exibidas no frontend. Eventos de falha de integração são F07.
-- Transições de `OperationStatus` (`CONFIRMED`/`REJECTED`) e seus eventos são F04; a atualização da conta
-  de recebimento após a confirmação é F05. A leitura da trilha na API e na interface é F06.
+- Transições de `OperationStatus` (`CONFIRMED`/`REJECTED`) e seus eventos são F04. A conta de recebimento
+  pode ser corrigida somente em operações `CONFIRMED` (F05): a aplicação envia `PUT` assinado à Central com
+  `protocolo`, `banco`, `agencia` e `conta`, persiste a nova conta e anexa `CONTA_ATUALIZADA` somente quando
+  os dados mudam; conta igual não chama a Central nem gera evento, e falha da Central não altera o estado
+  local. A leitura da trilha na API e na interface é F06.
 
 ## Estratégia de testes
 

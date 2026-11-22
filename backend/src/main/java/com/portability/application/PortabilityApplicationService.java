@@ -7,6 +7,7 @@ import com.portability.domain.model.BeneficiaryNotAuthorizedException;
 import com.portability.domain.model.CentralOperationStatus;
 import com.portability.domain.model.DiscountInstallment;
 import com.portability.domain.model.InstallmentStatus;
+import com.portability.domain.model.OperationNotConfirmedException;
 import com.portability.domain.model.OperationStatus;
 import com.portability.domain.model.PortabilityOperation;
 import com.portability.domain.model.PortabilityOperationResult;
@@ -16,6 +17,7 @@ import com.portability.domain.ports.in.GetOperationAuditUseCase;
 import com.portability.domain.ports.in.GetOperationStatusUseCase;
 import com.portability.domain.ports.in.RegisterAuthorizationUseCase;
 import com.portability.domain.ports.in.StartPortabilityUseCase;
+import com.portability.domain.ports.in.UpdateReceivingAccountUseCase;
 import com.portability.domain.ports.out.AuditEventRepository;
 import com.portability.domain.ports.out.AuthorizationRepository;
 import com.portability.domain.ports.out.BackoffPort;
@@ -45,8 +47,13 @@ import java.util.stream.Collectors;
  * Application layer: orchestrates the use cases using only domain ports.
  */
 @Service
-public class PortabilityApplicationService implements RegisterAuthorizationUseCase, GetDiscountAgendaUseCase,
-        StartPortabilityUseCase, GetOperationStatusUseCase, GetOperationAuditUseCase {
+public class PortabilityApplicationService implements
+    RegisterAuthorizationUseCase,
+    GetDiscountAgendaUseCase,
+    StartPortabilityUseCase,
+    GetOperationStatusUseCase,
+    UpdateReceivingAccountUseCase,
+    GetOperationAuditUseCase {
 
     private static final int MAX_STATUS_ATTEMPTS = 3;
     private static final Duration BASE_BACKOFF = Duration.ofSeconds(1);
@@ -206,6 +213,40 @@ public class PortabilityApplicationService implements RegisterAuthorizationUseCa
             return "Operação rejeitada pela Central: " + central.rejectionReason();
         }
         return "Operação confirmada pela Central com protocolo " + protocol;
+    }
+
+    @Override
+    public Optional<PortabilityOperation> updateReceivingAccount(
+            String operationId,
+            ReceivingAccount receivingAccount
+        ) {
+        requireNotBlank(operationId, "operationId");
+        requireAccount(receivingAccount);
+
+        Optional<PortabilityOperation> existing = operationRepository.findById(operationId);
+        if (existing.isEmpty()) {
+            return Optional.empty();
+        }
+        PortabilityOperation operation = existing.get();
+        if (operation.status() != OperationStatus.CONFIRMED) {
+            throw new OperationNotConfirmedException(
+                    "Somente operações confirmadas podem ter a conta alterada");
+        }
+        if (operation.receivingAccount().equals(receivingAccount)) {
+            return existing;
+        }
+
+        centralPortabilityPort.updateReceivingAccount(operation.protocol(), receivingAccount);
+        PortabilityOperation updated = operationRepository.updateReceivingAccount(operationId, receivingAccount);
+        auditEventRepository.append(new AuditEvent(
+                UUID.randomUUID().toString(),
+                updated.operationId(),
+                "CONTA_ATUALIZADA",
+                "Conta de recebimento atualizada para o protocolo " + operation.protocol() + ": "
+                        + receivingAccount.bank() + "/" + receivingAccount.agency() + "/"
+                        + receivingAccount.account(),
+                Instant.now()));
+        return Optional.of(updated);
     }
 
     @Override

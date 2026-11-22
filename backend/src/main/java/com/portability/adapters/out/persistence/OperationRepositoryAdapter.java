@@ -62,6 +62,16 @@ public class OperationRepositoryAdapter implements OperationRepository {
         return toDomain(repository.save(entity));
     }
 
+    @Override
+    public PortabilityOperation updateReceivingAccount(String operationId, ReceivingAccount receivingAccount) {
+        OperationJpaEntity entity = repository.findById(operationId)
+                .orElseThrow(() -> new IllegalArgumentException("Operação não encontrada: " + operationId));
+        entity.setBank(receivingAccount.bank());
+        entity.setAgency(receivingAccount.agency());
+        entity.setAccount(receivingAccount.account());
+        return toDomain(repository.save(entity));
+    }
+
     private static PortabilityOperation toDomain(OperationJpaEntity entity) {
         return new PortabilityOperation(
                 entity.getOperationId(),

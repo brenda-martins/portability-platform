@@ -7,6 +7,7 @@ import com.portability.domain.model.BeneficiaryNotAuthorizedException;
 import com.portability.domain.model.CentralOperationStatus;
 import com.portability.domain.model.DiscountInstallment;
 import com.portability.domain.model.InstallmentStatus;
+import com.portability.domain.model.OperationNotConfirmedException;
 import com.portability.domain.model.OperationStatus;
 import com.portability.domain.model.PortabilityOperation;
 import com.portability.domain.model.PortabilityOperationResult;
@@ -434,6 +435,99 @@ class PortabilityApplicationServiceTest {
         verifyNoInteractions(centralPortabilityPort, backoffPort, auditEventRepository);
     }
 
+    @Test
+    void shouldUpdateReceivingAccountAndAppendEventWhenOperationIsConfirmed() {
+        PortabilityOperation confirmed = operation("OPE-1", OperationStatus.CONFIRMED, null);
+        ReceivingAccount newAccount = new ReceivingAccount("002", "4321", "98765-4");
+        PortabilityOperation updated = operation("OPE-1", OperationStatus.CONFIRMED, null, newAccount);
+        when(operationRepository.findById("OPE-1")).thenReturn(Optional.of(confirmed));
+        when(centralPortabilityPort.updateReceivingAccount("PRT-OLD", newAccount)).thenReturn(newAccount);
+        when(operationRepository.updateReceivingAccount("OPE-1", newAccount)).thenReturn(updated);
+        when(auditEventRepository.append(any(AuditEvent.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        Optional<PortabilityOperation> result = service.updateReceivingAccount("OPE-1", newAccount);
+
+        assertTrue(result.isPresent());
+        assertSame(updated, result.get());
+        verify(centralPortabilityPort).updateReceivingAccount("PRT-OLD", newAccount);
+        verify(operationRepository).updateReceivingAccount("OPE-1", newAccount);
+        ArgumentCaptor<AuditEvent> event = ArgumentCaptor.forClass(AuditEvent.class);
+        verify(auditEventRepository).append(event.capture());
+        assertEquals("CONTA_ATUALIZADA", event.getValue().eventType());
+        assertEquals("OPE-1", event.getValue().operationId());
+        assertTrue(event.getValue().message().contains("PRT-OLD"));
+        assertTrue(event.getValue().message().contains("98765-4"));
+    }
+
+    @Test
+    void mustNotCallCentralOrAppendEventWhenAccountIsUnchanged() {
+        PortabilityOperation confirmed = operation("OPE-1", OperationStatus.CONFIRMED, null);
+        when(operationRepository.findById("OPE-1")).thenReturn(Optional.of(confirmed));
+
+        Optional<PortabilityOperation> result = service.updateReceivingAccount("OPE-1", account());
+
+        assertTrue(result.isPresent());
+        assertSame(confirmed, result.get());
+        verifyNoInteractions(centralPortabilityPort, auditEventRepository);
+        verify(operationRepository, never()).updateReceivingAccount(anyString(), any());
+    }
+
+    @Test
+    void mustRejectAccountUpdateWhenOperationIsPending() {
+        when(operationRepository.findById("OPE-1")).thenReturn(Optional.of(operation("OPE-1")));
+
+        assertThrows(OperationNotConfirmedException.class,
+                () -> service.updateReceivingAccount("OPE-1", newAccount()));
+
+        verifyNoInteractions(centralPortabilityPort, auditEventRepository);
+        verify(operationRepository, never()).updateReceivingAccount(anyString(), any());
+    }
+
+    @Test
+    void mustRejectAccountUpdateWhenOperationIsRejected() {
+        when(operationRepository.findById("OPE-1"))
+                .thenReturn(Optional.of(operation("OPE-1", OperationStatus.REJECTED, "Convênio bloqueado")));
+
+        assertThrows(OperationNotConfirmedException.class,
+                () -> service.updateReceivingAccount("OPE-1", newAccount()));
+
+        verifyNoInteractions(centralPortabilityPort, auditEventRepository);
+        verify(operationRepository, never()).updateReceivingAccount(anyString(), any());
+    }
+
+    @Test
+    void mustReturnEmptyWhenUpdatingUnknownOperation() {
+        when(operationRepository.findById("missing")).thenReturn(Optional.empty());
+
+        assertTrue(service.updateReceivingAccount("missing", newAccount()).isEmpty());
+
+        verifyNoInteractions(centralPortabilityPort, auditEventRepository);
+        verify(operationRepository, never()).updateReceivingAccount(anyString(), any());
+    }
+
+    @Test
+    void mustNotPersistAccountWhenCentralFails() {
+        when(operationRepository.findById("OPE-1"))
+                .thenReturn(Optional.of(operation("OPE-1", OperationStatus.CONFIRMED, null)));
+        when(centralPortabilityPort.updateReceivingAccount("PRT-OLD", newAccount()))
+                .thenThrow(new CentralUnavailableException("Central indisponível"));
+
+        assertThrows(CentralUnavailableException.class,
+                () -> service.updateReceivingAccount("OPE-1", newAccount()));
+
+        verify(operationRepository, never()).updateReceivingAccount(anyString(), any());
+        verifyNoInteractions(auditEventRepository);
+    }
+
+    @Test
+    void mustRejectBlankAccountWithoutTouchingOperationOrCentral() {
+        assertThrows(IllegalArgumentException.class, () -> service.updateReceivingAccount(
+                "OPE-1", new ReceivingAccount("001", " ", "56789-0")));
+
+        verifyNoInteractions(operationRepository, centralPortabilityPort, auditEventRepository);
+    }
+
     private void stubAuthorizationAndAgenda(List<DiscountInstallment> agenda) {
         when(operationRepository.findByIdempotencyKey(anyString())).thenReturn(Optional.empty());
         when(authorizationRepository.existsByBeneficiaryId(BENEFICIARY_ID)).thenReturn(true);
@@ -453,6 +547,10 @@ class PortabilityApplicationServiceTest {
         return new ReceivingAccount("001", "1234", "56789-0");
     }
 
+    private static ReceivingAccount newAccount() {
+        return new ReceivingAccount("002", "4321", "98765-4");
+    }
+
     private static DiscountInstallment openInstallment(String id, String date) {
         return new DiscountInstallment(id, AGREEMENT_ID, new BigDecimal("120.50"),
                 LocalDate.parse(date), InstallmentStatus.OPEN);
@@ -464,8 +562,13 @@ class PortabilityApplicationServiceTest {
 
     private static PortabilityOperation operation(String operationId, OperationStatus status,
             String rejectionReason) {
+        return operation(operationId, status, rejectionReason, account());
+    }
+
+    private static PortabilityOperation operation(String operationId, OperationStatus status,
+            String rejectionReason, ReceivingAccount account) {
         return new PortabilityOperation(operationId, BENEFICIARY_ID, List.of("INS-1"), CREDITOR,
-                account(), status, "PRT-OLD", rejectionReason,
+                account, status, "PRT-OLD", rejectionReason,
                 Instant.parse("2026-11-22T12:34:56Z"));
     }
 }

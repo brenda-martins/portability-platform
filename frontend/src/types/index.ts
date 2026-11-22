@@ -38,6 +38,7 @@ export interface PortabilityOperation {
   status: 'PENDING' | 'CONFIRMED' | 'REJECTED';
   protocol: string | null;
   rejectionReason: string | null;
+  receivingAccount: ReceivingAccount;
 }
 
 export interface AuditEvent {

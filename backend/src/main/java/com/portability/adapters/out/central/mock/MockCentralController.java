@@ -11,6 +11,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -37,6 +38,7 @@ public class MockCentralController {
     private final ObjectMapper objectMapper;
     private final Set<String> registeredProtocols = ConcurrentHashMap.newKeySet();
     private final Map<String, AtomicInteger> statusConsultations = new ConcurrentHashMap<>();
+    private final Map<String, Map<String, String>> updatedAccounts = new ConcurrentHashMap<>();
 
     public MockCentralController(SignaturePort signaturePort, ObjectMapper objectMapper) {
         this.signaturePort = signaturePort;
@@ -161,6 +163,51 @@ public class MockCentralController {
         body.put("status", "CONFIRMADA");
         body.put("motivoRejeicao", null);
         return ResponseEntity.ok(body);
+    }
+
+    @PutMapping("/operacoes-portabilidade/{protocol}/conta-recebimento")
+    public ResponseEntity<?> updateReceivingAccount(
+            @PathVariable String protocol,
+            @RequestBody String body,
+            @RequestHeader(value = "X-Signature", required = false) String signature
+    ) {
+        JsonNode payload;
+        String canonicalBody;
+        try {
+            payload = objectMapper.readTree(body);
+            if (payload == null || !payload.isObject()) {
+                return ResponseEntity.badRequest().build();
+            }
+            ObjectNode canonical = (ObjectNode) payload.deepCopy();
+            canonical.remove("assinatura");
+            canonicalBody = objectMapper.writeValueAsString(canonical);
+        } catch (JacksonException exception) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        if (signature == null || !signaturePort.verify(canonicalBody, signature)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        if (isBlank(protocol) || !registeredProtocols.contains(protocol)) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+        }
+        if (!isValidAccountUpdatePayload(payload, protocol)) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        Map<String, String> account = new LinkedHashMap<>();
+        account.put("banco", payload.path("banco").asText());
+        account.put("agencia", payload.path("agencia").asText());
+        account.put("conta", payload.path("conta").asText());
+        updatedAccounts.put(protocol, account);
+        return ResponseEntity.ok(account);
+    }
+
+    private static boolean isValidAccountUpdatePayload(JsonNode payload, String protocol) {
+        return protocol.equals(payload.path("protocolo").asText(""))
+                && !isBlank(payload.path("banco").asText(""))
+                && !isBlank(payload.path("agencia").asText(""))
+                && !isBlank(payload.path("conta").asText(""));
     }
 
     private static boolean isBlank(String value) {

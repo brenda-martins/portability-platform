@@ -44,6 +44,17 @@ const operation: PortabilityOperation = {
   status: 'PENDING',
   protocol: 'PRT-1',
   rejectionReason: null,
+  receivingAccount: { bank: '001', agency: '1234', account: '56789-0' },
+};
+
+const confirmedOperation: PortabilityOperation = {
+  ...operation,
+  status: 'CONFIRMED',
+};
+
+const updatedOperation: PortabilityOperation = {
+  ...confirmedOperation,
+  receivingAccount: { bank: '002', agency: '4321', account: '98765-4' },
 };
 
 function respondWith(value: unknown) {
@@ -74,6 +85,28 @@ function fillOperationForm() {
   fireEvent.change(screen.getByLabelText(/^banco$/i), { target: { value: '001' } });
   fireEvent.change(screen.getByLabelText(/agência/i), { target: { value: '1234' } });
   fireEvent.change(screen.getByLabelText(/^conta$/i), { target: { value: '56789-0' } });
+}
+
+async function registerOperationWithStatus(
+  statusOperation: PortabilityOperation,
+  extraRoutes: Record<string, unknown> = {},
+) {
+  respondByPath({
+    '/authorizations': authorization,
+    '/portability': statusOperation,
+    ...extraRoutes,
+  });
+  render(<App />);
+  await authorize();
+  fillOperationForm();
+  fireEvent.click(screen.getByRole('button', { name: /registrar portabilidade/i }));
+  await screen.findByText(statusOperation.status);
+}
+
+async function waitForUpdateFormToShowBank(bank: string) {
+  await waitFor(() => {
+    expect((screen.getByLabelText(/novo banco/i) as HTMLInputElement).value).toBe(bank);
+  });
 }
 
 describe('App', () => {
@@ -252,6 +285,7 @@ describe('App', () => {
       status: 'REJECTED',
       protocol: 'PRT-2',
       rejectionReason: 'Convênio bloqueado',
+      receivingAccount: { bank: '001', agency: '1234', account: '56789-0' },
     };
     respondByPath({ '/authorizations': authorization, '/portability': rejected });
     render(<App />);
@@ -346,5 +380,63 @@ describe('App', () => {
     fireEvent.click(screen.getByRole('button', { name: /consultar auditoria/i }));
 
     expect(await screen.findByText(/nenhum evento registrado/i)).toBeTruthy();
+  });
+
+  it('must not offer account update while the operation is pending', async () => {
+    await registerOperationWithStatus(operation);
+
+    expect(screen.queryByRole('button', { name: /atualizar conta/i })).toBeNull();
+  });
+
+  it('must show the update form filled with the current account when the operation is confirmed', async () => {
+    await registerOperationWithStatus(confirmedOperation);
+
+    await waitForUpdateFormToShowBank('001');
+    expect((screen.getByLabelText(/nova agência/i) as HTMLInputElement).value).toBe('1234');
+    expect((screen.getByLabelText(/nova conta/i) as HTMLInputElement).value).toBe('56789-0');
+  });
+
+  it('must send the new account and display it after the update', async () => {
+    await registerOperationWithStatus(confirmedOperation, {
+      '/portability/OPE-1/receiving-account': updatedOperation,
+    });
+    await waitForUpdateFormToShowBank('001');
+
+    fireEvent.change(screen.getByLabelText(/novo banco/i), { target: { value: '002' } });
+    fireEvent.change(screen.getByLabelText(/nova agência/i), { target: { value: '4321' } });
+    fireEvent.change(screen.getByLabelText(/nova conta/i), { target: { value: '98765-4' } });
+    fireEvent.click(screen.getByRole('button', { name: /atualizar conta/i }));
+
+    await waitFor(() => {
+      expect(mockedApiFetch).toHaveBeenCalledWith('/portability/OPE-1/receiving-account', {
+        method: 'PUT',
+        body: JSON.stringify({ bank: '002', agency: '4321', account: '98765-4' }),
+      });
+    });
+    expect(await screen.findByText(/98765-4/)).toBeTruthy();
+  });
+
+  it('must display the API error message when the account update fails', async () => {
+    mockedApiFetch.mockImplementation(async (path) => {
+      if (path === '/authorizations') return authorization as never;
+      if (path === '/portability') return confirmedOperation as never;
+      if (path === '/portability/OPE-1/receiving-account') {
+        throw new Error('Request failed: 502');
+      }
+      return [] as never;
+    });
+    render(<App />);
+
+    await authorize();
+    fillOperationForm();
+    fireEvent.click(screen.getByRole('button', { name: /registrar portabilidade/i }));
+    await screen.findByText('CONFIRMED');
+    await waitForUpdateFormToShowBank('001');
+
+    fireEvent.change(screen.getByLabelText(/nova conta/i), { target: { value: '98765-4' } });
+    fireEvent.click(screen.getByRole('button', { name: /atualizar conta/i }));
+
+    const alert = await screen.findByRole('alert');
+    expect(alert.textContent).toContain('502');
   });
 });

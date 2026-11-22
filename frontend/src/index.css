@@ -58,6 +58,17 @@
   font-size: 1.1rem;
 }
 
+.subform {
+  margin-top: var(--space-sm);
+  padding-top: var(--space-sm);
+  border-top: 1px solid var(--color-border);
+}
+
+.subform h3 {
+  margin-top: 0;
+  font-size: 1rem;
+}
+
 .field {
   display: flex;
   flex-direction: column;

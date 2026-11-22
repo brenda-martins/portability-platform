@@ -176,6 +176,7 @@ Ver [`AGENTS.md`](AGENTS.md), seção "Agentes e skills".
 | `GET` | `/api/beneficiaries/{beneficiaryId}/agenda` | `200`, `400`, `403`, `502` | Listar parcelas da agenda de beneficiário autorizado |
 | `POST` | `/api/portability` | `201`, `200` (reenvio), `400`, `403`, `502` | Registrar operação de portabilidade com conta de recebimento |
 | `GET` | `/api/portability/{operationId}` | `200`, `404`, `502` | Consultar status da operação (acompanha a confirmação na Central) |
+| `PUT` | `/api/portability/{operationId}/receiving-account` | `200`, `400`, `404`, `409`, `502` | Atualizar a conta de recebimento após a confirmação |
 | `GET` | `/api/portability/{operationId}/audit` | `404` | Consultar trilha de eventos |
 
 `GET /api/portability/{operationId}` consulta a Central enquanto a operação está `PENDING`, respeitando
@@ -183,6 +184,11 @@ Ver [`AGENTS.md`](AGENTS.md), seção "Agentes e skills".
 erros"). A resposta é sempre a operação com o status mais recente; se a confirmação não chegar dentro das
 tentativas, o status continua `PENDING` e uma nova consulta retoma o acompanhamento. Operação já
 `CONFIRMED` ou `REJECTED` não consulta a Central.
+
+`PUT /api/portability/{operationId}/receiving-account` aceita `{ "bank", "agency", "account" }` somente para
+operações `CONFIRMED` (`409` caso contrário). A conta é enviada assinada à Central pelo protocolo, a operação
+local é atualizada e um evento `CONTA_ATUALIZADA` é anexado à trilha. Um reenvio com a conta igual à atual
+responde `200` sem chamar a Central e sem gerar evento. Falha da Central responde `502` e não altera a conta.
 
 ### Central de Convênios simulada (`/central`)
 
@@ -193,6 +199,7 @@ tentativas, o status continua `PENDING` e uma nova consulta retoma o acompanhame
 | `GET` | `/central/beneficiarios/{beneficiaryId}/agenda` | `200` | Listar parcelas (fixture fixa por beneficiário) |
 | `POST` | `/central/operacoes-portabilidade` | `202`, `400`, `401` | Registrar operação; `202` devolve `{ "protocolo": "..." }` |
 | `GET` | `/central/operacoes-portabilidade/{protocol}` | `204` + `Retry-After`, `200`, `404` | Consultar status da operação (mock: pendente nas duas primeiras consultas) |
+| `PUT` | `/central/operacoes-portabilidade/{protocol}/conta-recebimento` | `200`, `400`, `401`, `404` | Atualizar a conta de recebimento (assinado) |
 
 `POST /central/autorizacoes` exige o cabeçalho `X-Signature`: HMAC-SHA256 em Base64 do corpo exato da
 requisição, calculado com `central.hmac-secret` (`CENTRAL_HMAC_SECRET`). Assinatura ausente ou inválida
@@ -206,6 +213,11 @@ mesmo protocolo. Assinatura ausente/inválida responde `401` e payload inválido
 `GET /central/operacoes-portabilidade/{protocolo}` não exige assinatura nem corpo. No mock, as duas
 primeiras consultas a um protocolo respondem `204` com `Retry-After: 1`; a partir da terceira, respondem
 `200` com `CONFIRMADA`. Protocolo desconhecido responde `404`.
+
+`PUT /central/operacoes-portabilidade/{protocolo}/conta-recebimento` usa o mesmo esquema de assinatura do
+registro: corpo canônico em pt-BR sem `assinatura`, HMAC enviado no cabeçalho `X-Signature` e no próprio
+campo. Responde `200` com a conta aceita; payload incompleto responde `400`, assinatura inválida `401` e
+protocolo desconhecido `404`.
 
 Payloads da Central (pt-BR, conforme o PDF):
 
@@ -254,6 +266,18 @@ Payloads da Central (pt-BR, conforme o PDF):
 
 // GET /central/operacoes-portabilidade/{protocolo}
 { "status": "CONFIRMADA", "motivoRejeicao": null }
+
+// PUT /api/portability/{operationId}/receiving-account
+{ "bank": "002", "agency": "4321", "account": "98765-4" }
+
+// PUT /central/operacoes-portabilidade/{protocolo}/conta-recebimento
+{
+  "protocolo": "PRT-...",
+  "banco": "002", "agencia": "4321", "conta": "98765-4",
+  "assinatura": "..."
+}
+// resposta 200
+{ "banco": "002", "agencia": "4321", "conta": "98765-4" }
 ```
 
 A agenda exige uma autorização registrada para o beneficiário; sem ela, a API responde `403`. A

@@ -18,4 +18,7 @@ public interface CentralPortabilityPort {
 
     /** Queries the asynchronous confirmation for a protocol. */
     CentralOperationStatus consultStatus(String protocol);
+
+    /** Updates the receiving account of a confirmed operation, returning the account accepted by the Central. */
+    ReceivingAccount updateReceivingAccount(String protocol, ReceivingAccount receivingAccount);
 }

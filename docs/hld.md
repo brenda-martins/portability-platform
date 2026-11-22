@@ -89,7 +89,13 @@ sequenceDiagram
     C-->>A: 204 pendente (2x) ou 200 com status final
     A->>A: atualiza status e anexa evento quando há transição
     A-->>F: 200 com a operação (ainda PENDING se não confirmou)
-    Note over A,C: F05 atualiza a conta após CONFIRMED; F06 expõe a trilha
+    Note over F,A: F05: com a operação CONFIRMED, o operador corrige a conta de recebimento
+    F->>A: PUT /api/portability/{operationId}/receiving-account
+    A->>C: PUT /central/operacoes-portabilidade/{protocol} (HMAC)
+    C-->>A: 200 com a conta aceita
+    A->>A: atualiza conta local e anexa evento CONTA_ATUALIZADA
+    A-->>F: 200 com a operação atualizada
+    Note over A,C: F06 expõe a trilha; F07 trata rejeições e falhas da Central
 ```
 
 ## Documentos relacionados

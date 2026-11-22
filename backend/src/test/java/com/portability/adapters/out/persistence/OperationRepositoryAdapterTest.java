@@ -82,6 +82,25 @@ class OperationRepositoryAdapterTest {
         assertEquals(IDEMPOTENCY_KEY, springRepository.findById("OPE-1").orElseThrow().getIdempotencyKey());
     }
 
+    @Test
+    void shouldUpdateOnlyReceivingAccount() {
+        PortabilityOperation saved = repository.save(operation(), IDEMPOTENCY_KEY);
+        ReceivingAccount newAccount = new ReceivingAccount("002", "4321", "98765-4");
+
+        PortabilityOperation updated = repository.updateReceivingAccount("OPE-1", newAccount);
+
+        assertEquals(newAccount, updated.receivingAccount());
+        assertEquals(saved.operationId(), updated.operationId());
+        assertEquals(saved.beneficiaryId(), updated.beneficiaryId());
+        assertEquals(saved.installmentIds(), updated.installmentIds());
+        assertEquals(saved.creditorAssignee(), updated.creditorAssignee());
+        assertEquals(saved.status(), updated.status());
+        assertEquals(saved.protocol(), updated.protocol());
+        assertEquals(saved.rejectionReason(), updated.rejectionReason());
+        assertEquals(saved.requestedAt(), updated.requestedAt());
+        assertEquals(IDEMPOTENCY_KEY, springRepository.findById("OPE-1").orElseThrow().getIdempotencyKey());
+    }
+
     private static PortabilityOperation operation() {
         return new PortabilityOperation("OPE-1", "BEN-123", List.of("INS-1", "INS-2"),
                 "Nova Credora S.A.", new ReceivingAccount("001", "1234", "56789-0"),

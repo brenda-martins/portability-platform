@@ -1,6 +1,7 @@
 package com.portability.adapters.in.web;
 
 import com.portability.domain.model.BeneficiaryNotAuthorizedException;
+import com.portability.domain.model.OperationNotConfirmedException;
 import com.portability.domain.ports.out.CentralUnavailableException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -28,6 +29,12 @@ public class ApiExceptionHandler {
     @ExceptionHandler(BeneficiaryNotAuthorizedException.class)
     public ResponseEntity<Map<String, String>> handleNotAuthorized(BeneficiaryNotAuthorizedException exception) {
         return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(Map.of("message", exception.getMessage()));
+    }
+
+    @ExceptionHandler(OperationNotConfirmedException.class)
+    public ResponseEntity<Map<String, String>> handleNotConfirmed(OperationNotConfirmedException exception) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(Map.of("message", exception.getMessage()));
     }
 

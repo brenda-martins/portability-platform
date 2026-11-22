@@ -45,6 +45,10 @@ class CentralClientTest {
     private String statusRetryAfter;
     private String statusPath;
     private String statusSignature;
+    private int accountStatus;
+    private String accountBody;
+    private String accountPath;
+    private String accountSignature;
 
     @BeforeEach
     void setUp() throws IOException {
@@ -59,6 +63,8 @@ class CentralClientTest {
         statusCode = 204;
         statusBody = "";
         statusRetryAfter = "1";
+        accountStatus = 200;
+        accountBody = "{\"banco\":\"002\",\"agencia\":\"4321\",\"conta\":\"98765-4\"}";
         server = HttpServer.create(new InetSocketAddress(0), 0);
         server.createContext("/central/autorizacoes", exchange -> {
             receivedBody = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
@@ -77,6 +83,17 @@ class CentralClientTest {
             exchange.close();
         });
         server.createContext("/central/operacoes-portabilidade", exchange -> {
+            if ("PUT".equals(exchange.getRequestMethod())) {
+                accountPath = exchange.getRequestURI().getPath();
+                accountSignature = exchange.getRequestHeaders().getFirst("X-Signature");
+                receivedBody = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+                byte[] response = accountBody.getBytes(StandardCharsets.UTF_8);
+                exchange.getResponseHeaders().add("Content-Type", "application/json");
+                exchange.sendResponseHeaders(accountStatus, response.length);
+                exchange.getResponseBody().write(response);
+                exchange.close();
+                return;
+            }
             if ("GET".equals(exchange.getRequestMethod())) {
                 statusPath = exchange.getRequestURI().getPath();
                 statusSignature = exchange.getRequestHeaders().getFirst("X-Signature");
@@ -250,8 +267,44 @@ class CentralClientTest {
         assertThrows(CentralUnavailableException.class, () -> client.consultStatus("PRT-1"));
     }
 
+    @Test
+    void mustSendSignedPutWithProtocolAndReturnUpdatedAccount() throws Exception {
+        ReceivingAccount updated = client.updateReceivingAccount(
+                "PRT-1", new ReceivingAccount("002", "4321", "98765-4"));
+
+        assertEquals(new ReceivingAccount("002", "4321", "98765-4"), updated);
+        assertEquals("/central/operacoes-portabilidade/PRT-1/conta-recebimento", accountPath);
+        JsonNode payload = new ObjectMapper().readTree(receivedBody);
+        assertEquals("PRT-1", payload.path("protocolo").asText());
+        assertEquals("002", payload.path("banco").asText());
+        assertEquals("4321", payload.path("agencia").asText());
+        assertEquals("98765-4", payload.path("conta").asText());
+        String expectedSignature = signatureService.sign(CANONICAL_ACCOUNT_BODY);
+        assertEquals(expectedSignature, payload.path("assinatura").asText());
+        assertEquals(expectedSignature, accountSignature);
+    }
+
+    @Test
+    void shouldFailWhenCentralRejectsAccountUpdate() {
+        accountStatus = 401;
+
+        assertThrows(CentralUnavailableException.class, () -> client.updateReceivingAccount(
+                "PRT-1", new ReceivingAccount("002", "4321", "98765-4")));
+    }
+
+    @Test
+    void shouldFailWhenCentralReturnsUnexpectedAccount() {
+        accountBody = "{\"banco\":\" \",\"agencia\":\"4321\",\"conta\":\"98765-4\"}";
+
+        assertThrows(CentralUnavailableException.class, () -> client.updateReceivingAccount(
+                "PRT-1", new ReceivingAccount("002", "4321", "98765-4")));
+    }
+
     private static final String CANONICAL_PORTABILITY_BODY =
             "{\"beneficiarioId\":\"BEN-123\",\"parcelas\":[\"INS-1\"],"
                     + "\"credorCessionario\":\"Nova Credora S.A.\","
                     + "\"contaRecebimento\":{\"banco\":\"001\",\"agencia\":\"1234\",\"conta\":\"56789-0\"}}";
+
+    private static final String CANONICAL_ACCOUNT_BODY =
+            "{\"protocolo\":\"PRT-1\",\"banco\":\"002\",\"agencia\":\"4321\",\"conta\":\"98765-4\"}";
 }

@@ -212,6 +212,45 @@ public class CentralClient implements DiscountAgendaPort, CentralPortabilityPort
         }
     }
 
+    @Override
+    public ReceivingAccount updateReceivingAccount(
+            String protocol,
+            ReceivingAccount receivingAccount
+    ) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("protocolo", protocol);
+        payload.put("banco", receivingAccount.bank());
+        payload.put("agencia", receivingAccount.agency());
+        payload.put("conta", receivingAccount.account());
+
+        try {
+            String canonicalBody = objectMapper.writeValueAsString(payload);
+            String signature = signaturePort.sign(canonicalBody);
+            payload.put("assinatura", signature);
+            String body = objectMapper.writeValueAsString(payload);
+
+            ResponseEntity<CentralReceivingAccountResponse> response = restClient.put()
+                    .uri("/operacoes-portabilidade/{protocol}/conta-recebimento", protocol)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .header("X-Signature", signature)
+                    .body(body)
+                    .retrieve()
+                    .toEntity(CentralReceivingAccountResponse.class);
+
+            CentralReceivingAccountResponse result = response.getBody();
+            if (response.getStatusCode() != HttpStatus.OK
+                    || result == null
+                    || isBlank(result.banco())
+                    || isBlank(result.agencia())
+                    || isBlank(result.conta())) {
+                throw new CentralUnavailableException("Resposta inesperada da Central");
+            }
+            return new ReceivingAccount(result.banco(), result.agencia(), result.conta());
+        } catch (RestClientException | JacksonException exception) {
+            throw new CentralUnavailableException("Central indisponível", exception);
+        }
+    }
+
     private static Duration retryAfter(ResponseEntity<?> response) {
         String header = response.getHeaders().getFirst(HttpHeaders.RETRY_AFTER);
         if (header == null || header.isBlank()) {
@@ -231,6 +270,9 @@ public class CentralClient implements DiscountAgendaPort, CentralPortabilityPort
     }
 
     private record CentralOperationStatusResponse(String status, String motivoRejeicao) {
+    }
+
+    private record CentralReceivingAccountResponse(String banco, String agencia, String conta) {
     }
 
     private record CentralInstallment(String parcelaId, String convenioId, BigDecimal valor,
