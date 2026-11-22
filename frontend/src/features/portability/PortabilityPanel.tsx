@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { apiFetch } from '../../api/client';
+import { PanelHeader } from '../../components/PanelHeader';
 import type { Authorization, PortabilityOperation } from '../../types';
 
 interface PortabilityPanelProps {
@@ -100,33 +101,44 @@ export function PortabilityPanel({
 
   return (
     <section className="panel">
-      <h2>3. Portabilidade</h2>
+      <PanelHeader
+        step={3}
+        title="Portabilidade"
+        description="Registre a operação e acompanhe a confirmação assíncrona."
+      />
       <form onSubmit={handleRegister}>
-        <div className="field">
-          <label htmlFor="creditor-assignee">Credor cessionário</label>
-          <input
-            id="creditor-assignee"
-            value={creditorAssignee}
-            onChange={(event) => setCreditorAssignee(event.target.value)}
-          />
-        </div>
-        <div className="field">
-          <label htmlFor="bank">Banco</label>
-          <input id="bank" value={bank} onChange={(event) => setBank(event.target.value)} />
-        </div>
-        <div className="field">
-          <label htmlFor="agency">Agência</label>
-          <input id="agency" value={agency} onChange={(event) => setAgency(event.target.value)} />
-        </div>
-        <div className="field">
-          <label htmlFor="account">Conta</label>
-          <input id="account" value={account} onChange={(event) => setAccount(event.target.value)} />
+        <div className="field-grid">
+          <div className="field">
+            <label htmlFor="creditor-assignee">Credor cessionário</label>
+            <input
+              id="creditor-assignee"
+              value={creditorAssignee}
+              onChange={(event) => setCreditorAssignee(event.target.value)}
+            />
+          </div>
+          <div className="field">
+            <label htmlFor="bank">Banco</label>
+            <input id="bank" value={bank} onChange={(event) => setBank(event.target.value)} />
+          </div>
+          <div className="field">
+            <label htmlFor="agency">Agência</label>
+            <input id="agency" value={agency} onChange={(event) => setAgency(event.target.value)} />
+          </div>
+          <div className="field">
+            <label htmlFor="account">Conta</label>
+            <input id="account" value={account} onChange={(event) => setAccount(event.target.value)} />
+          </div>
         </div>
         <div className="form-actions">
           <button className="button" type="submit" disabled={!authorization || loading}>
             Registrar portabilidade
           </button>
-          <button className="button" type="button" onClick={handleRefreshStatus} disabled={!operation || loading}>
+          <button
+            className="button button--secondary"
+            type="button"
+            onClick={handleRefreshStatus}
+            disabled={!operation || loading}
+          >
             Consultar status
           </button>
           {loading && <span className="hint">Carregando…</span>}
@@ -136,29 +148,31 @@ export function PortabilityPanel({
       {operation?.status === 'CONFIRMED' && (
         <form className="subform" onSubmit={handleUpdateAccount}>
           <h3>Atualizar conta de recebimento</h3>
-          <div className="field">
-            <label htmlFor="update-bank">Novo banco</label>
-            <input
-              id="update-bank"
-              value={updateBank}
-              onChange={(event) => setUpdateBank(event.target.value)}
-            />
-          </div>
-          <div className="field">
-            <label htmlFor="update-agency">Nova agência</label>
-            <input
-              id="update-agency"
-              value={updateAgency}
-              onChange={(event) => setUpdateAgency(event.target.value)}
-            />
-          </div>
-          <div className="field">
-            <label htmlFor="update-account">Nova conta</label>
-            <input
-              id="update-account"
-              value={updateAccount}
-              onChange={(event) => setUpdateAccount(event.target.value)}
-            />
+          <div className="field-grid">
+            <div className="field">
+              <label htmlFor="update-bank">Novo banco</label>
+              <input
+                id="update-bank"
+                value={updateBank}
+                onChange={(event) => setUpdateBank(event.target.value)}
+              />
+            </div>
+            <div className="field">
+              <label htmlFor="update-agency">Nova agência</label>
+              <input
+                id="update-agency"
+                value={updateAgency}
+                onChange={(event) => setUpdateAgency(event.target.value)}
+              />
+            </div>
+            <div className="field">
+              <label htmlFor="update-account">Nova conta</label>
+              <input
+                id="update-account"
+                value={updateAccount}
+                onChange={(event) => setUpdateAccount(event.target.value)}
+              />
+            </div>
           </div>
           <div className="form-actions">
             <button className="button" type="submit" disabled={loading}>
@@ -176,26 +190,30 @@ export function PortabilityPanel({
         </p>
       )}
       {operation && (
-        <p>
-          Operação {operation.operationId}:{' '}
-          <span className={`status${operation.status === 'REJECTED' ? ' status--rejected' : ''}`}>
-            {operation.status}
-          </span>
-        </p>
-      )}
-      {operation?.receivingAccount && (
-        <p>
-          Conta de recebimento:{' '}
-          <strong>
-            {operation.receivingAccount.bank} / {operation.receivingAccount.agency} /{' '}
-            {operation.receivingAccount.account}
-          </strong>
-        </p>
-      )}
-      {operation?.protocol && (
-        <p>
-          Protocolo: <strong>{operation.protocol}</strong>
-        </p>
+        <dl className="operation-summary">
+          <div className="summary-row">
+            <dt>Operação</dt>
+            <dd>
+              {operation.operationId}{' '}
+              <span className={`status status--${operation.status.toLowerCase()}`}>{operation.status}</span>
+            </dd>
+          </div>
+          {operation.protocol && (
+            <div className="summary-row">
+              <dt>Protocolo</dt>
+              <dd>{operation.protocol}</dd>
+            </div>
+          )}
+          {operation.receivingAccount && (
+            <div className="summary-row">
+              <dt>Conta de recebimento</dt>
+              <dd>
+                {operation.receivingAccount.bank} / {operation.receivingAccount.agency} /{' '}
+                {operation.receivingAccount.account}
+              </dd>
+            </div>
+          )}
+        </dl>
       )}
       {operation?.status === 'REJECTED' && operation.rejectionReason && (
         <p className="alert" role="alert">

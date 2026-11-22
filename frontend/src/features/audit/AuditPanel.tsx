@@ -1,9 +1,26 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { apiFetch } from '../../api/client';
+import { PanelHeader } from '../../components/PanelHeader';
 import type { AuditEvent, PortabilityOperation } from '../../types';
 
 interface AuditPanelProps {
   operation: PortabilityOperation | null;
+}
+
+function eventTypeClass(eventType: string): string {
+  if (eventType.includes('REJEITADA') || eventType.includes('FALHA')) {
+    return 'event-type event-type--danger';
+  }
+  if (eventType.includes('CONFIRMADA')) {
+    return 'event-type event-type--success';
+  }
+  return 'event-type';
+}
+
+function formatDate(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(date);
 }
 
 export function AuditPanel({ operation }: AuditPanelProps) {
@@ -25,7 +42,9 @@ export function AuditPanel({ operation }: AuditPanelProps) {
     setLoading(true);
     setError(null);
     try {
-      const trail = await apiFetch<AuditEvent[]>(`/portability/${operationId}/audit`);
+      const trail = await apiFetch<AuditEvent[]>(
+        `/portability/${encodeURIComponent(operationId.trim())}/audit`,
+      );
       setEvents(trail);
       setConsulted(true);
     } catch (cause) {
@@ -37,7 +56,11 @@ export function AuditPanel({ operation }: AuditPanelProps) {
 
   return (
     <section className="panel">
-      <h2>4. Auditoria</h2>
+      <PanelHeader
+        step={4}
+        title="Auditoria"
+        description="Eventos imutáveis da operação, em ordem de ocorrência."
+      />
       <form onSubmit={handleConsult}>
         <div className="field">
           <label htmlFor="audit-operation-id">ID da operação</label>
@@ -48,7 +71,7 @@ export function AuditPanel({ operation }: AuditPanelProps) {
           />
         </div>
         <div className="form-actions">
-          <button className="button" type="submit" disabled={!operationId || loading}>
+          <button className="button button--secondary" type="submit" disabled={!operationId || loading}>
             Consultar auditoria
           </button>
           {loading && <span className="hint">Carregando…</span>}
@@ -60,14 +83,18 @@ export function AuditPanel({ operation }: AuditPanelProps) {
           {error}
         </p>
       )}
-      {consulted && events.length === 0 && <p className="hint">Nenhum evento registrado.</p>}
+      {consulted && events.length === 0 && <p className="hint hint--block">Nenhum evento registrado.</p>}
       {events.length > 0 && (
         <ul className="event-list">
           {[...events]
             .sort((left, right) => left.occurredAt.localeCompare(right.occurredAt))
             .map((eventItem) => (
               <li key={eventItem.eventId}>
-                <span className="event-type">{eventItem.eventType}</span> <span>{eventItem.message}</span>
+                <span className={eventTypeClass(eventItem.eventType)}>{eventItem.eventType}</span>
+                <span>{eventItem.message}</span>
+                <time className="event-time" dateTime={eventItem.occurredAt}>
+                  {formatDate(eventItem.occurredAt)}
+                </time>
               </li>
             ))}
         </ul>

@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { apiFetch } from '../../api/client';
+import { PanelHeader } from '../../components/PanelHeader';
 import type { Authorization, DiscountInstallment } from '../../types';
 
 interface AgendaPanelProps {
@@ -35,7 +36,7 @@ export function AgendaPanel({
     setError(null);
     try {
       const items = await apiFetch<DiscountInstallment[]>(
-        `/beneficiaries/${authorization.beneficiaryId}/agenda`,
+        `/beneficiaries/${encodeURIComponent(authorization.beneficiaryId)}/agenda`,
       );
       onInstallmentsLoaded(items);
       setConsulted(true);
@@ -56,10 +57,14 @@ export function AgendaPanel({
 
   return (
     <section className="panel">
-      <h2>2. Agenda de descontos</h2>
+      <PanelHeader
+        step={2}
+        title="Agenda de descontos"
+        description="Parcelas futuras devolvidas pela Central de Convênios."
+      />
       <form onSubmit={handleConsult}>
         <div className="form-actions">
-          <button className="button" type="submit" disabled={!authorization || loading}>
+          <button className="button button--secondary" type="submit" disabled={!authorization || loading}>
             Consultar agenda
           </button>
           {!authorization && <span className="hint">Autorize o beneficiário para consultar a agenda.</span>}
@@ -72,18 +77,23 @@ export function AgendaPanel({
           {error}
         </p>
       )}
-      {consulted && installments.length === 0 && <p className="hint">Nenhuma parcela futura disponível.</p>}
+      {consulted && installments.length === 0 && (
+        <p className="hint hint--block">
+          Nenhuma parcela futura disponível para {authorization?.beneficiaryId}. A simulação possui dados
+          apenas para BEN-123.
+        </p>
+      )}
 
       {installments.length > 0 && (
         <table className="installments">
           <thead>
             <tr>
-              <th>Selecionar</th>
-              <th>Parcela</th>
-              <th>Convênio</th>
-              <th>Data</th>
-              <th>Valor</th>
-              <th>Status</th>
+              <th scope="col">Selecionar</th>
+              <th scope="col">Parcela</th>
+              <th scope="col">Convênio</th>
+              <th scope="col">Data</th>
+              <th scope="col">Valor</th>
+              <th scope="col">Status</th>
             </tr>
           </thead>
           <tbody>

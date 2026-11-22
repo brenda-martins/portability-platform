@@ -20,20 +20,24 @@ export default function App() {
   return (
     <Layout>
       <AuthorizationPanel onAuthorized={setAuthorization} />
-      <AgendaPanel
-        authorization={authorization}
-        installments={installments}
-        selectedInstallmentIds={selectedInstallmentIds}
-        onInstallmentsLoaded={handleInstallmentsLoaded}
-        onSelectionChange={setSelectedInstallmentIds}
-      />
-      <PortabilityPanel
-        authorization={authorization}
-        selectedInstallmentIds={selectedInstallmentIds}
-        operation={operation}
-        onOperationRegistered={setOperation}
-      />
-      <AuditPanel operation={operation} />
+      {authorization && (
+        <>
+          <AgendaPanel
+            authorization={authorization}
+            installments={installments}
+            selectedInstallmentIds={selectedInstallmentIds}
+            onInstallmentsLoaded={handleInstallmentsLoaded}
+            onSelectionChange={setSelectedInstallmentIds}
+          />
+          <PortabilityPanel
+            authorization={authorization}
+            selectedInstallmentIds={selectedInstallmentIds}
+            operation={operation}
+            onOperationRegistered={setOperation}
+          />
+          <AuditPanel operation={operation} />
+        </>
+      )}
     </Layout>
   );
 }

@@ -124,14 +124,14 @@ describe('App', () => {
     cleanup();
   });
 
-  it('It should render all four panels without placeholders when the screen loads', () => {
+  it('deve exibir somente o painel de autorização quando a tela é aberta', () => {
     render(<App />);
 
     expect(screen.getByRole('heading', { name: /portability platform/i })).toBeTruthy();
     expect(screen.getByRole('heading', { name: /autorização/i })).toBeTruthy();
-    expect(screen.getByRole('heading', { name: /agenda/i })).toBeTruthy();
-    expect(screen.getByRole('heading', { name: /portabilidade/i })).toBeTruthy();
-    expect(screen.getByRole('heading', { name: /auditoria/i })).toBeTruthy();
+    expect(screen.queryByRole('heading', { name: /agenda/i })).toBeNull();
+    expect(screen.queryByRole('heading', { name: /portabilidade/i })).toBeNull();
+    expect(screen.queryByRole('heading', { name: /auditoria/i })).toBeNull();
     expect(screen.queryByText(/todo:/i)).toBeNull();
   });
 
@@ -172,15 +172,18 @@ describe('App', () => {
     expect(alert.textContent).toContain('Central indisponível');
   });
 
-  it('should enable the schedule only after authorization', async () => {
+  it('deve exibir os painéis de agenda, portabilidade e auditoria quando a autorização é registrada', async () => {
     respondByPath({ '/authorizations': authorization });
     render(<App />);
 
-    expect((screen.getByRole('button', { name: /consultar agenda/i }) as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.queryByRole('button', { name: /consultar agenda/i })).toBeNull();
 
     await authorize();
 
     expect((screen.getByRole('button', { name: /consultar agenda/i }) as HTMLButtonElement).disabled).toBe(false);
+    expect(screen.getByRole('heading', { name: /agenda/i })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: /portabilidade/i })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: /auditoria/i })).toBeTruthy();
   });
 
   it('the authorized beneficiary must be submitted when the schedule is consulted', async () => {
@@ -544,5 +547,41 @@ describe('App', () => {
 
     expect(await screen.findByRole('alert')).toBeTruthy();
     await waitFor(() => expect(screen.queryByText('Trilha antiga')).toBeNull());
+  });
+
+  it('deve exibir os identificadores da simulação já preenchidos quando a tela é aberta', () => {
+    render(<App />);
+
+    expect((screen.getByLabelText(/id do beneficiário/i) as HTMLInputElement).value).toBe('BEN-123');
+    expect((screen.getByLabelText(/id do convênio/i) as HTMLInputElement).value).toBe('AGR-001');
+    expect(screen.getByText(/valores da simulação/i)).toBeTruthy();
+  });
+
+  it('deve enviar os identificadores sem espaços nas bordas quando a autorização é registrada', async () => {
+    respondWith(authorization);
+    render(<App />);
+
+    fireEvent.change(screen.getByLabelText(/id do beneficiário/i), { target: { value: '  BEN-123  ' } });
+    fireEvent.change(screen.getByLabelText(/id do convênio/i), { target: { value: ' AGR-001 ' } });
+    fireEvent.click(screen.getByRole('button', { name: /autorizar/i }));
+
+    await waitFor(() => {
+      expect(mockedApiFetch).toHaveBeenCalledWith('/authorizations', {
+        method: 'POST',
+        body: JSON.stringify({ beneficiaryId: 'BEN-123', agreementId: 'AGR-001' }),
+      });
+    });
+  });
+
+  it('deve explicar no estado vazio da agenda quando o beneficiário não tem parcelas', async () => {
+    respondByPath({ '/authorizations': authorization });
+    render(<App />);
+    await authorize();
+    respondWith([]);
+
+    fireEvent.click(screen.getByRole('button', { name: /consultar agenda/i }));
+
+    expect(await screen.findByText(/nenhuma parcela futura disponível para BEN-123/i)).toBeTruthy();
+    expect(screen.getByText(/dados apenas para BEN-123/i)).toBeTruthy();
   });
 });
