@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
+import { describeApiError } from '../../api/ApiError';
 import { apiFetch } from '../../api/client';
 import { PanelHeader } from '../../components/PanelHeader';
 import type { AuditEvent, PortabilityOperation } from '../../types';
@@ -48,7 +49,7 @@ export function AuditPanel({ operation }: AuditPanelProps) {
       setEvents(trail);
       setConsulted(true);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Não foi possível consultar a auditoria.');
+      setError(describeApiError(cause, 'Não foi possível consultar a auditoria.'));
     } finally {
       setLoading(false);
     }

@@ -182,7 +182,9 @@ Erros da API usam `{ "message": "...", "fields": { ... }, "correlationId": "..."
 somente em erros de validação e `correlationId`, quando há contexto de requisição. Os códigos seguem o
 domínio: `400` entrada inválida, `403` beneficiário sem `opt-in`, `404` operação inexistente, `409`
 operação não confirmada, versão desatualizada ou par beneficiário+convênio já autorizado, `502` falha da
-Central.
+Central. O frontend gera e envia `X-Correlation-Id` em toda chamada e exibe o `correlationId` recebido
+na mensagem de erro. O registro reserva a chave de idempotência antes de chamar a Central: reenvios
+concorrentes da mesma solicitação devolvem `200` com a operação existente, sem gerar novo protocolo.
 
 ### Central de Convênios simulada (`/central`)
 
@@ -273,6 +275,12 @@ O Hibernate cria as tabelas no startup (`spring.jpa.hibernate.ddl-auto: update`)
 (`jdbc:postgresql://localhost:5433/portability`, via Compose). Nos testes, o perfil `test` usa H2 em
 memória com `ddl-auto: create-drop`. Mapeamentos de domínio em
 [`docs/lld.md`](docs/lld.md), seção "Persistência".
+
+### `idempotency_reservations`
+
+| Coluna | Tipo | Observação |
+| --- | --- | --- |
+| `idempotency_key` | String (PK) | Chave SHA-256 da solicitação, reservada antes da chamada à Central |
 
 ### `authorizations`
 

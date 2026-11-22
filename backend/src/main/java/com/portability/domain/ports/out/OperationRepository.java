@@ -6,6 +6,8 @@ import java.util.Optional;
 
 public interface OperationRepository {
 
+    void reserveIdempotencyKey(String idempotencyKey);
+
     PortabilityOperation save(PortabilityOperation operation, String idempotencyKey);
 
     /** Persists the whole aggregate state, checking the version read by the caller. */

@@ -1,5 +1,6 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { ApiError } from './api/ApiError';
 import { apiFetch } from './api/client';
 import type { AuditEvent, Authorization, DiscountInstallment, PortabilityOperation } from './types';
 import App from './App';
@@ -286,6 +287,20 @@ describe('App', () => {
 
     const alert = await screen.findByRole('alert');
     expect(alert.textContent).toContain('Parcela já portada');
+  });
+
+  it('must display the correlationId when the record fails', async () => {
+    respondByPath({ '/authorizations': authorization });
+    render(<App />);
+    await authorize();
+    fillOperationForm();
+    mockedApiFetch.mockRejectedValueOnce(new ApiError('Central indisponível', 502, 'corr-123'));
+
+    fireEvent.click(screen.getByRole('button', { name: /registrar portabilidade/i }));
+
+    const alert = await screen.findByRole('alert');
+    expect(alert.textContent).toContain('Central indisponível');
+    expect(alert.textContent).toContain('corr-123');
   });
 
   it('must display the reason for rejection when the operation is rejected', async () => {

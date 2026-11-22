@@ -59,6 +59,7 @@ public class GetOperationStatusService implements GetOperationStatusUseCase {
     @Override
     public Optional<PortabilityOperation> getOperationStatus(String operationId) {
         Validation.requireNotBlank(operationId, "operationId");
+        
         Optional<PortabilityOperation> found = operationRepository.findById(operationId);
         if (found.isEmpty()) {
             return Optional.empty();

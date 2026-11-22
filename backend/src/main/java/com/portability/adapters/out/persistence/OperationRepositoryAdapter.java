@@ -1,10 +1,13 @@
 package com.portability.adapters.out.persistence;
 
+import com.portability.adapters.out.persistence.entity.IdempotencyReservationJpaEntity;
 import com.portability.adapters.out.persistence.entity.OperationJpaEntity;
 import com.portability.domain.model.ConcurrentOperationException;
+import com.portability.domain.model.DuplicateIdempotencyKeyException;
 import com.portability.domain.model.PortabilityOperation;
 import com.portability.domain.model.ReceivingAccount;
 import com.portability.domain.ports.out.OperationRepository;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.stereotype.Component;
 
@@ -16,9 +19,24 @@ import java.util.Optional;
 public class OperationRepositoryAdapter implements OperationRepository {
 
     private final SpringDataOperationRepository repository;
+    private final SpringDataIdempotencyReservationRepository reservations;
 
-    public OperationRepositoryAdapter(SpringDataOperationRepository repository) {
+    public OperationRepositoryAdapter(
+        final SpringDataOperationRepository repository,
+        final SpringDataIdempotencyReservationRepository reservations
+    ) {
         this.repository = repository;
+        this.reservations = reservations;
+    }
+
+    @Override
+    public void reserveIdempotencyKey(String idempotencyKey) {
+        try {
+            reservations.saveAndFlush(new IdempotencyReservationJpaEntity(idempotencyKey));
+        } catch (DataIntegrityViolationException exception) {
+            throw new DuplicateIdempotencyKeyException(
+                    "Idempotency key already reserved", exception);
+        }
     }
 
     @Override

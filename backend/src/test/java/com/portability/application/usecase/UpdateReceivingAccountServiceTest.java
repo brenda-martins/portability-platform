@@ -39,7 +39,7 @@ class UpdateReceivingAccountServiceTest {
         state = new TestDoubles.State();
         operations = new TestDoubles.Operations(state);
         auditEvents = new TestDoubles.AuditEvents(state);
-        central = new TestDoubles.Central();
+        central = new TestDoubles.Central(state);
         metrics = new TestDoubles.Metrics();
         service = new UpdateReceivingAccountService(operations, auditEvents, central,
                 new TestDoubles.Transactions(state), TestDoubles.fixedClock(NOW),

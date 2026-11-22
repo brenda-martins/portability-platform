@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
+import { describeApiError } from '../../api/ApiError';
 import { apiFetch } from '../../api/client';
 import { PanelHeader } from '../../components/PanelHeader';
 import type { Authorization, PortabilityOperation } from '../../types';
@@ -56,7 +57,7 @@ export function PortabilityPanel({
       });
       onOperationRegistered(result);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Não foi possível registrar a operação.');
+      setError(describeApiError(cause, 'Não foi possível registrar a operação.'));
     } finally {
       setLoading(false);
     }
@@ -78,7 +79,7 @@ export function PortabilityPanel({
       );
       onOperationRegistered(result);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Não foi possível atualizar a conta.');
+      setError(describeApiError(cause, 'Não foi possível atualizar a conta.'));
     } finally {
       setLoading(false);
     }
@@ -93,7 +94,7 @@ export function PortabilityPanel({
       const result = await apiFetch<PortabilityOperation>(`/portability/${operation.operationId}`);
       onOperationRegistered(result);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Não foi possível consultar o status.');
+      setError(describeApiError(cause, 'Não foi possível consultar o status.'));
     } finally {
       setLoading(false);
     }

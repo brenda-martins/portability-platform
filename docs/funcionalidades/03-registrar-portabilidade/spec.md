@@ -25,6 +25,9 @@ id, métricas e assemblagem — estão em [`../../lld.md`](../../lld.md).
 | `POST` | `/api/portability` | chave de idempotência em conflito | `409` com `{ "message": "..." }` |
 | `POST` | `/api/portability` | falha na Central | `502` com `{ "message": "..." }` |
 
+A chave é reservada antes da chamada à Central. Reenvios concorrentes da mesma solicitação devolvem `200`
+com a operação existente, sem registrar novo protocolo; a reserva é desfeita se a integração falhar.
+
 Corpo da solicitação:
 
 ```json
@@ -64,8 +67,9 @@ ordem e verifica o HMAC. O mesmo codec é usado pelo opt-in (F01) e pela atualiz
 - `CentralPortabilityPort.registerPortability(...)` não recebe assinatura: a assinatura passa a ser
   responsabilidade do adapter, que conhece o contrato em pt-BR.
 - `OperationRepository.findByIdempotencyKey(String)` localiza o reenvio;
-  `save(PortabilityOperation, String)` insere a operação nova com a chave de idempotência e
-  `save(PortabilityOperation)` persiste o estado completo com a versão esperada.
+  `reserveIdempotencyKey(String)` reserva a chave antes da integração e sinaliza conflito com
+  `DuplicateIdempotencyKeyException`; `save(PortabilityOperation, String)` insere a operação nova com a
+  chave de idempotência e `save(PortabilityOperation)` persiste o estado completo com a versão esperada.
 - `PortabilityOperationResult` é um record de domínio, sem framework. `PortabilityOperation` calcula a
   chave de idempotência, guarda a `version` e mantém as transições no domínio.
 
@@ -74,11 +78,14 @@ ordem e verifica o HMAC. O mesmo codec é usado pelo opt-in (F01) e pela atualiz
 - `PortabilityRequest` e `ReceivingAccountRequest` são DTOs da borda cujo `validate()` chama as
   invariantes de `Validation` no domínio; não há Bean Validation duplicada. O controller chama
   `validate()` antes do caso de uso. `ApiExceptionHandler` devolve `400` com `fields` para
-  `InvalidRequestException` e `409` para violação de unicidade da chave de idempotência.
+  `InvalidRequestException` e `409` para outras violações de unicidade; conflito de reserva da chave é
+  resolvido no caso de uso como reenvio.
 - `StartPortabilityService` valida os campos, calcula a chave SHA-256 em hex de
-  `beneficiaryId|parcelas ordenadas|credor|banco|agência|conta` e consulta `findByIdempotencyKey`. Se
-  existir, devolve a operação com `created = false` **antes** de qualquer chamada à Central. Caso
-  contrário, verifica a autorização do beneficiário, busca a agenda em `DiscountAgendaPort`, exige que
+  `beneficiaryId|parcelas ordenadas|credor|banco|agência|conta`, consulta `findByIdempotencyKey` e reserva
+  a chave em `idempotency_reservations`. Se a operação existir, devolve-a com `created = false` **antes**
+  de qualquer chamada à Central. Se a reserva conflitar com outra transação já confirmada, uma nova
+  transação lê a operação existente e devolve `created = false`. Caso contrário, verifica a autorização do
+  beneficiário, busca a agenda em `DiscountAgendaPort`, exige que
   todas as parcelas selecionadas estejam presentes, sejam `OPEN` e tenham `discountDate` estritamente
   futuro, e rejeita duplicatas na seleção. A gravação usa `save(operation, idempotencyKey)`; a coluna
   `idempotency_key` é única.
@@ -86,8 +93,8 @@ ordem e verifica o HMAC. O mesmo codec é usado pelo opt-in (F01) e pela atualiz
   `PortabilityOperation` com `operationId` gerado por `IdGenerator`, `status = PENDING`, protocolo
   devolvido, `requestedAt = Instant.now(clock)` e `version = 0`, salva no repositório e anexa um
   `AuditEvent` de tipo `SOLICITADA` com o protocolo na mensagem. Escrita e evento compartilham
-  `TransactionPort`: falha ao anexar o evento desfaz a operação. Falha da Central não grava operação nem
-  evento.
+  `TransactionPort`: falha ao anexar o evento desfaz a operação e a reserva. Falha da Central não grava
+  operação nem evento.
 - `CentralClient.registerPortability` usa o `RestClient` com timeout já configurado, converte qualquer
   resposta diferente de `202`, corpo ausente ou `protocolo` em branco em `CentralUnavailableException`,
   e traduz falhas de transporte/JSON da mesma forma.
@@ -105,11 +112,13 @@ ordem e verifica o HMAC. O mesmo codec é usado pelo opt-in (F01) e pela atualiz
 
 ## Decisões de teste
 
-- `StartPortabilityServiceTest` (unitário, fakes dos ports): criação com evento, reenvio sem chamar a
-  Central nem gravar evento, chave independente da ordem das parcelas, beneficiário sem autorização,
+- `StartPortabilityServiceTest` (unitário, fakes dos ports): criação com evento, reserva antes da chamada
+  à Central, conflito de reserva devolvendo a operação existente sem chamar a Central, reenvio sem gravar
+  evento, chave independente da ordem das parcelas, beneficiário sem autorização,
   parcela inexistente/não aberta/passada, seleção vazia, campos em branco, falha da Central sem gravação
-  e rollback quando a gravação reporta concorrência. `OperationTransactionalTest` cobre a atomicidade
-  com Spring.
+  e rollback quando a gravação reporta concorrência. `StartPortabilityIdempotencyConcurrencyTest` (H2)
+  cobre duas requisições idênticas simultâneas: uma criação, um reenvio e uma única chamada à Central.
+  `OperationTransactionalTest` cobre a atomicidade com Spring.
 - `CentralClientTest` (HTTP em processo): corpo assinado, `X-Signature`, protocolo devolvido e erro da
   Central.
 - `PortabilityControllerContractTest` (`MockMvc`, caso de uso mockado): `201`, `200`, `400`, `409` e

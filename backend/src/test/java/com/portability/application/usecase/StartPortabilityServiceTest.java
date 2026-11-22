@@ -49,7 +49,7 @@ class StartPortabilityServiceTest {
         auditEvents = new TestDoubles.AuditEvents(state);
         authorizations = new TestDoubles.Authorizations(state);
         agenda = new TestDoubles.Agenda();
-        central = new TestDoubles.Central();
+        central = new TestDoubles.Central(state);
         metrics = new TestDoubles.Metrics();
         service = new StartPortabilityService(operations, authorizations, auditEvents, agenda, central,
                 new TestDoubles.Transactions(state), TestDoubles.fixedClock(REQUESTED_AT),
@@ -87,6 +87,33 @@ class StartPortabilityServiceTest {
 
         assertFalse(result.created());
         assertEquals(existing, result.operation());
+        assertTrue(state.auditEvents.isEmpty());
+        assertTrue(metrics.names.contains("portability.resend"));
+    }
+
+    @Test
+    void mustReserveIdempotencyKeyBeforeCallingCentral() {
+        authorize();
+        agenda.installments = List.of(openInstallment("INS-1", "2099-01-10"));
+
+        service.startPortability(BENEFICIARY, List.of("INS-1"), CREDITOR, account());
+
+        assertEquals(List.of("reserve", "central"), state.calls);
+    }
+
+    @Test
+    void mustReturnExistingOperationWithoutCallingCentralWhenReservationConflicts() {
+        PortabilityOperation existing = pendingOperation("OPE-OLD");
+        operations.seed(existing, PortabilityOperation.idempotencyKey(
+                BENEFICIARY, List.of("INS-1"), CREDITOR, account()));
+        operations.hideExistingOnFirstLookup = true;
+
+        PortabilityOperationResult result = service.startPortability(
+                BENEFICIARY, List.of("INS-1"), CREDITOR, account());
+
+        assertFalse(result.created());
+        assertEquals(existing, result.operation());
+        assertEquals(0, central.registrations);
         assertTrue(state.auditEvents.isEmpty());
         assertTrue(metrics.names.contains("portability.resend"));
     }

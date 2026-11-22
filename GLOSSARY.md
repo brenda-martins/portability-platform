@@ -21,7 +21,7 @@ Central usa os nomes em português do PDF e é traduzido no adapter.
 | Trilha de auditoria | `getAuditTrail` | Eventos de uma operação, ordenados por ocorrência; nunca sobrescritos. |
 | Central de Convênios | `CentralClient` / `MockCentralController` | Sistema externo que concentra autorizações e agenda. Aqui é simulado em `/central`. |
 | Confirmação assíncrona | `consultStatus`, `Retry-After` | Padrão em que a Central devolve protocolo imediatamente e o status chega depois por consulta. |
-| Idempotência | `findByProtocol` | Propriedade de reenvios não gerarem operações duplicadas na Central nem localmente. |
+| Idempotência | `idempotencyKey`, `findByIdempotencyKey` | Propriedade de reenvios não gerarem operações duplicadas na Central nem localmente; a chave é reservada antes da integração. |
 | Assinatura | `signature` / `assinatura` | HMAC-SHA256 em Base64 usado para integridade das mensagens trocadas com a Central. |
 | Backoff | `BackoffPort` | Estratégia de espera progressiva entre tentativas de consulta de status. |
 | Funcionalidade | — | Uma entrega demonstrável no produto, descrita pelo que a pessoa consegue fazer (ver `docs/roadmap.md`). |

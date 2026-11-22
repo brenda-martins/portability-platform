@@ -34,7 +34,8 @@ devolvido no contrato (`SOLICITADA`, `CONFIRMADA`, `REJEITADA`, `FALHA_INTEGRACA
 
 Erros tipados em `domain/model` e `domain/ports/out`: `InvalidRequestException` (com `fields` por
 invariante), `BeneficiaryNotAuthorizedException`, `OperationNotConfirmedException`,
-`ConcurrentOperationException`, `CentralUnavailableException`; todos derivam de `DomainException`.
+`ConcurrentOperationException`, `DuplicateIdempotencyKeyException`, `CentralUnavailableException`; todos
+derivam de `DomainException`.
 
 ## Ports
 
@@ -55,7 +56,7 @@ invariante), `BeneficiaryNotAuthorizedException`, `OperationNotConfirmedExceptio
 | --- | --- | --- |
 | `AuthorizationRepository` | `AuthorizationRepositoryAdapter` | salvar/buscar autorização por beneficiário e convênio; verificar existência por beneficiário |
 | `CentralAuthorizationPort` | `CentralClient` | registrar o opt-in na Central e devolver o `autorizacaoId` |
-| `OperationRepository` | `OperationRepositoryAdapter` | salvar o agregado com chave de idempotência; salvar estado completo com versão esperada; buscar por id e por chave |
+| `OperationRepository` | `OperationRepositoryAdapter` | reservar a chave antes da integração; salvar o agregado com chave de idempotência; salvar estado completo com versão esperada; buscar por id e por chave |
 | `AuditEventRepository` | `AuditEventRepositoryAdapter` | anexar eventos e listar os de uma operação em ordem de ocorrência |
 | `DiscountAgendaPort` | `CentralClient` | buscar agenda na Central (usada também para validar a seleção) |
 | `CentralPortabilityPort` | `CentralClient` | registrar operação assinada, consultar status assíncrono e atualizar a conta de recebimento |
@@ -104,6 +105,8 @@ A tradução acontece em `adapters/out/central`:
   `operation_installments`, coluna `position`), `idempotency_key` única para reconhecer reenvios e
   `@Version` na coluna `version`.
 - `AuditEventRepositoryAdapter.append` é **append-only**: insert sem update/delete.
+- `reserveIdempotencyKey` insere a chave em `idempotency_reservations` antes da chamada à Central; conflito
+  de unicidade vira `DuplicateIdempotencyKeyException` e o caso de uso resolve o reenvio em nova transação.
 - `OperationRepository.save(operation, idempotencyKey)` insere a operação nova.
   `save(operation)` persiste o agregado inteiro (status, motivo, conta, versão) e confere a versão lida
   pelo chamador; versão desatualizada ou ausente vira `ConcurrentOperationException` (`409`), inclusive
@@ -156,8 +159,10 @@ A tradução acontece em `adapters/out/central`:
 - `HmacSignatureService`: HMAC-SHA256 em Base64 com segredo de `central.hmac-secret`; verificação em
   tempo constante.
 - Registro: antes de qualquer chamada à Central, `startPortability` calcula a chave SHA-256 em hex de
-  `beneficiaryId|parcelas ordenadas|credor|banco|agência|conta` e consulta `findByIdempotencyKey`; se
-  existir, devolve a operação com `created = false` (`200`). Caso contrário, exige autorização do
+  `beneficiaryId|parcelas ordenadas|credor|banco|agência|conta`, consulta `findByIdempotencyKey` e reserva
+  a chave. Se a operação existir, devolve-a com `created = false` (`200`); se a reserva conflitar com uma
+  transação já confirmada, nova transação lê a operação existente e também devolve `200`. A reserva é
+  desfeita junto com a transação quando a chamada à Central falha. Caso contrário, exige autorização do
   beneficiário (`403`), reconsulta a agenda e só aceita parcelas existentes, `OPEN` e com data futura,
   sem duplicatas. A criação persiste a operação `PENDING` e anexa um evento `SOLICITADA` com o protocolo;
   falha da Central não grava operação nem evento.

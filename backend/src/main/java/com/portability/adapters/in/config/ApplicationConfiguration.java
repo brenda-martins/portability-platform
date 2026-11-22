@@ -44,7 +44,8 @@ public class ApplicationConfiguration {
             CentralAuthorizationPort centralAuthorizationPort,
             TransactionPort transactions,
             Clock clock,
-            MetricsPort metrics) {
+            MetricsPort metrics
+        ) {
         return new RegisterAuthorizationService(authorizationRepository, centralAuthorizationPort,
                 transactions, clock, metrics);
     }
@@ -53,7 +54,8 @@ public class ApplicationConfiguration {
     public GetDiscountAgendaUseCase getDiscountAgendaUseCase(
             AuthorizationRepository authorizationRepository,
             DiscountAgendaPort discountAgendaPort,
-            MetricsPort metrics) {
+            MetricsPort metrics
+        ) {
         return new GetDiscountAgendaService(authorizationRepository, discountAgendaPort, metrics);
     }
 
@@ -67,7 +69,8 @@ public class ApplicationConfiguration {
             TransactionPort transactions,
             Clock clock,
             IdGenerator ids,
-            MetricsPort metrics) {
+            MetricsPort metrics
+        ) {
         return new StartPortabilityService(operationRepository, authorizationRepository,
                 auditEventRepository, discountAgendaPort, centralPortabilityPort,
                 transactions, clock, ids, metrics);
@@ -82,7 +85,8 @@ public class ApplicationConfiguration {
             TransactionPort transactions,
             Clock clock,
             IdGenerator ids,
-            MetricsPort metrics) {
+            MetricsPort metrics
+        ) {
         return new GetOperationStatusService(operationRepository, auditEventRepository,
                 centralPortabilityPort, backoffPort, transactions, clock, ids, metrics);
     }
@@ -95,7 +99,8 @@ public class ApplicationConfiguration {
             TransactionPort transactions,
             Clock clock,
             IdGenerator ids,
-            MetricsPort metrics) {
+            MetricsPort metrics
+        ) {
         return new UpdateReceivingAccountService(operationRepository, auditEventRepository,
                 centralPortabilityPort, transactions, clock, ids, metrics);
     }
@@ -104,7 +109,8 @@ public class ApplicationConfiguration {
     public GetOperationAuditUseCase getOperationAuditUseCase(
             OperationRepository operationRepository,
             AuditEventRepository auditEventRepository,
-            MetricsPort metrics) {
+            MetricsPort metrics
+        ) {
         return new GetOperationAuditService(operationRepository, auditEventRepository, metrics);
     }
 }

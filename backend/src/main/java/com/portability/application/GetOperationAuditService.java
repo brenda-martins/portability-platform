@@ -29,9 +29,11 @@ public class GetOperationAuditService implements GetOperationAuditUseCase {
     @Override
     public Optional<List<AuditEvent>> getAuditTrail(String operationId) {
         Validation.requireNotBlank(operationId, "operationId");
+        
         if (operationRepository.findById(operationId).isEmpty()) {
             return Optional.empty();
         }
+        
         List<AuditEvent> events = auditEventRepository.findByOperationId(operationId);
         metrics.increment("audit.consulted");
         return Optional.of(events);

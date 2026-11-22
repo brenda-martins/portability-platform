@@ -43,7 +43,7 @@ class GetOperationStatusServiceTest {
         state = new TestDoubles.State();
         operations = new TestDoubles.Operations(state);
         auditEvents = new TestDoubles.AuditEvents(state);
-        central = new TestDoubles.Central();
+        central = new TestDoubles.Central(state);
         backoff = new TestDoubles.Backoff();
         metrics = new TestDoubles.Metrics();
         service = new GetOperationStatusService(operations, auditEvents, central, backoff,

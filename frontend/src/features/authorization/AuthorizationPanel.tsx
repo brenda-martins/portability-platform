@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react';
+import { describeApiError } from '../../api/ApiError';
 import { apiFetch } from '../../api/client';
 import { PanelHeader } from '../../components/PanelHeader';
 import type { Authorization, AuthorizeRequest } from '../../types';
@@ -32,7 +33,7 @@ export function AuthorizationPanel({ onAuthorized }: AuthorizationPanelProps) {
       onAuthorized(authorization);
       setConfirmation(`Autorização registrada: ${authorization.authorizationId}`);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Não foi possível registrar a autorização.');
+      setError(describeApiError(cause, 'Não foi possível registrar a autorização.'));
     } finally {
       setLoading(false);
     }

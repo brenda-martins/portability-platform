@@ -29,9 +29,11 @@ public class GetDiscountAgendaService implements GetDiscountAgendaUseCase {
     @Override
     public List<DiscountInstallment> getAgenda(String beneficiaryId) {
         Validation.requireNotBlank(beneficiaryId, "beneficiaryId");
+        
         if (!authorizationRepository.existsByBeneficiaryId(beneficiaryId)) {
             throw new BeneficiaryNotAuthorizedException("Beneficiary not authorized");
         }
+        
         List<DiscountInstallment> agenda = discountAgendaPort.fetchAgenda(beneficiaryId);
         metrics.increment("agenda.consulted");
         return agenda;

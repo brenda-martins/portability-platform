@@ -3,6 +3,8 @@ package com.portability.application;
 import com.portability.domain.model.AuditEvent;
 import com.portability.domain.model.AuditEventType;
 import com.portability.domain.model.BeneficiaryNotAuthorizedException;
+import com.portability.domain.model.ConcurrentOperationException;
+import com.portability.domain.model.DuplicateIdempotencyKeyException;
 import com.portability.domain.model.OperationStatus;
 import com.portability.domain.model.PortabilityOperation;
 import com.portability.domain.model.PortabilityOperationResult;
@@ -77,55 +79,66 @@ public class StartPortabilityService implements StartPortabilityUseCase {
                 receivingAccount
             );
 
-        return transactions.inTransaction(() -> {
-            Optional<PortabilityOperation> existing = operationRepository.findByIdempotencyKey(idempotencyKey);
-            if (existing.isPresent()) {
-                metrics.increment("portability.resend");
-                return new PortabilityOperationResult(existing.get(), false);
-            }
+        try {
+            return transactions.inTransaction(() -> {
+                Optional<PortabilityOperation> existing = operationRepository.findByIdempotencyKey(idempotencyKey);
+                if (existing.isPresent()) {
+                    return resend(existing.get());
+                }
+                operationRepository.reserveIdempotencyKey(idempotencyKey);
 
-            if (!authorizationRepository.existsByBeneficiaryId(beneficiaryId)) {
-                throw new BeneficiaryNotAuthorizedException("Beneficiary not authorized");
-            }
+                if (!authorizationRepository.existsByBeneficiaryId(beneficiaryId)) {
+                    throw new BeneficiaryNotAuthorizedException("Beneficiary not authorized");
+                }
 
-            Validation.requireEligibleInstallments(
-                selection,
-                discountAgendaPort.fetchAgenda(beneficiaryId), 
-                LocalDate.now(clock)
-            );
+                Validation.requireEligibleInstallments(
+                        selection,
+                        discountAgendaPort.fetchAgenda(beneficiaryId),
+                        LocalDate.now(clock)
+                    );
 
-            String protocol = centralPortabilityPort.registerPortability(
-                    beneficiaryId, 
-                    selection, 
-                    creditorAssignee, 
-                    receivingAccount
-                );
-            Instant requestedAt = Instant.now(clock);
+                String protocol = centralPortabilityPort.registerPortability(
+                        beneficiaryId,
+                        selection,
+                        creditorAssignee,
+                        receivingAccount
+                    );
+                Instant requestedAt = Instant.now(clock);
 
-            PortabilityOperation operation = new PortabilityOperation(
-                    ids.next(), 
-                    beneficiaryId, 
-                    selection, 
-                    creditorAssignee, 
-                    receivingAccount,
-                    OperationStatus.PENDING, 
-                    protocol, 
-                    null, 
-                    requestedAt, 
-                    0L
-                );
+                PortabilityOperation operation = new PortabilityOperation(
+                        ids.next(),
+                        beneficiaryId,
+                        selection,
+                        creditorAssignee,
+                        receivingAccount,
+                        OperationStatus.PENDING,
+                        protocol,
+                        null,
+                        requestedAt,
+                        0L
+                    );
 
-            PortabilityOperation saved = operationRepository.save(operation, idempotencyKey);
-            auditEventRepository.append(new AuditEvent(
-                    ids.next(), 
-                    saved.operationId(),
-                    AuditEventType.REQUESTED,
-                    "Operação solicitada com protocolo " + protocol, 
-                    requestedAt
-                )
-            );
-            metrics.increment("portability.created");
-            return new PortabilityOperationResult(saved, true);
-        });
+                PortabilityOperation saved = operationRepository.save(operation, idempotencyKey);
+                auditEventRepository.append(new AuditEvent(
+                        ids.next(),
+                        saved.operationId(),
+                        AuditEventType.REQUESTED,
+                        "Operação solicitada com protocolo " + protocol,
+                        requestedAt
+                    ));
+                metrics.increment("portability.created");
+                return new PortabilityOperationResult(saved, true);
+            });
+        } catch (DuplicateIdempotencyKeyException exception) {
+            return transactions.inTransaction(() -> operationRepository.findByIdempotencyKey(idempotencyKey)
+                    .map(this::resend)
+                    .orElseThrow(() -> new ConcurrentOperationException(
+                            "Operation being recorded; please try again")));
+        }
+    }
+
+    private PortabilityOperationResult resend(PortabilityOperation operation) {
+        metrics.increment("portability.resend");
+        return new PortabilityOperationResult(operation, false);
     }
 }

@@ -77,8 +77,12 @@ public record PortabilityOperation(
     }
 
     /** Hash that recognises a resend of the same portability request. */
-    public static String idempotencyKey(String beneficiaryId, List<String> installmentIds,
-            String creditorAssignee, ReceivingAccount account) {
+    public static String idempotencyKey(
+        String beneficiaryId, 
+        List<String> installmentIds,
+        String creditorAssignee, 
+        ReceivingAccount account
+    ) {
         String canonical = String.join("|",
                 Validation.requireNotBlank(beneficiaryId, "beneficiaryId"),
                 String.join(",", Validation.requireSelection(installmentIds).stream().sorted().toList()),

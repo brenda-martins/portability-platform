@@ -5,6 +5,7 @@ import com.portability.domain.model.Authorization;
 import com.portability.domain.model.CentralOperationStatus;
 import com.portability.domain.model.ConcurrentOperationException;
 import com.portability.domain.model.DiscountInstallment;
+import com.portability.domain.model.DuplicateIdempotencyKeyException;
 import com.portability.domain.model.PortabilityOperation;
 import com.portability.domain.model.ReceivingAccount;
 import com.portability.domain.ports.out.AuditEventRepository;
@@ -27,8 +28,10 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
@@ -43,12 +46,15 @@ final class TestDoubles {
 
         final Map<String, PortabilityOperation> operations = new LinkedHashMap<>();
         final Map<String, PortabilityOperation> operationsByKey = new LinkedHashMap<>();
+        final Set<String> reservations = new LinkedHashSet<>();
         final List<AuditEvent> auditEvents = new ArrayList<>();
         final List<Authorization> authorizations = new ArrayList<>();
+        final List<String> calls = new ArrayList<>();
 
         Runnable snapshot() {
             Map<String, PortabilityOperation> operationsCopy = new LinkedHashMap<>(operations);
             Map<String, PortabilityOperation> keysCopy = new LinkedHashMap<>(operationsByKey);
+            Set<String> reservationsCopy = new LinkedHashSet<>(reservations);
             List<AuditEvent> eventsCopy = new ArrayList<>(auditEvents);
             List<Authorization> authorizationsCopy = new ArrayList<>(authorizations);
             return () -> {
@@ -56,6 +62,8 @@ final class TestDoubles {
                 operations.putAll(operationsCopy);
                 operationsByKey.clear();
                 operationsByKey.putAll(keysCopy);
+                reservations.clear();
+                reservations.addAll(reservationsCopy);
                 auditEvents.clear();
                 auditEvents.addAll(eventsCopy);
                 authorizations.clear();
@@ -93,6 +101,16 @@ final class TestDoubles {
         }
 
         boolean failOnSave;
+        boolean hideExistingOnFirstLookup;
+        private int lookups;
+
+        @Override
+        public void reserveIdempotencyKey(String idempotencyKey) {
+            state.calls.add("reserve");
+            if (!state.reservations.add(idempotencyKey)) {
+                throw new DuplicateIdempotencyKeyException("Chave de idempotência já reservada");
+            }
+        }
 
         @Override
         public PortabilityOperation save(PortabilityOperation operation, String idempotencyKey) {
@@ -123,6 +141,10 @@ final class TestDoubles {
 
         @Override
         public Optional<PortabilityOperation> findByIdempotencyKey(String idempotencyKey) {
+            lookups++;
+            if (hideExistingOnFirstLookup && lookups == 1) {
+                return Optional.empty();
+            }
             return Optional.ofNullable(state.operationsByKey.get(idempotencyKey));
         }
 
@@ -134,6 +156,7 @@ final class TestDoubles {
         void seed(PortabilityOperation operation, String idempotencyKey) {
             state.operations.put(operation.operationId(), operation);
             state.operationsByKey.put(idempotencyKey, operation);
+            state.reservations.add(idempotencyKey);
         }
 
         private static PortabilityOperation nextVersion(PortabilityOperation operation) {
@@ -217,7 +240,14 @@ final class TestDoubles {
 
     static final class Central implements CentralPortabilityPort {
 
+        private final State state;
+
+        Central(State state) {
+            this.state = state;
+        }
+
         String protocol = "PRT-1";
+        int registrations;
         final Deque<CentralOperationStatus> statuses = new ArrayDeque<>();
         final List<ReceivingAccount> accountUpdates = new ArrayList<>();
         RuntimeException registrationFailure;
@@ -230,6 +260,8 @@ final class TestDoubles {
             if (registrationFailure != null) {
                 throw registrationFailure;
             }
+            registrations++;
+            state.calls.add("central");
             return protocol;
         }
 

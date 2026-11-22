@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react';
+import { describeApiError } from '../../api/ApiError';
 import { apiFetch } from '../../api/client';
 import { PanelHeader } from '../../components/PanelHeader';
 import type { Authorization, DiscountInstallment } from '../../types';
@@ -41,7 +42,7 @@ export function AgendaPanel({
       onInstallmentsLoaded(items);
       setConsulted(true);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Não foi possível consultar a agenda.');
+      setError(describeApiError(cause, 'Não foi possível consultar a agenda.'));
     } finally {
       setLoading(false);
     }
