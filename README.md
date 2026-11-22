@@ -169,56 +169,39 @@ Ver [`AGENTS.md`](AGENTS.md), seção "Agentes e skills".
 ## Documentação da API
 
 ### API da aplicação (`/api`)
-
-Os paths abaixo já têm controllers reservados. Como ainda não há métodos handler, **retornam `404`** —
-exceto o health check.
-
-| Método | Endpoint | Estado | Descrição prevista |
+| Método | Endpoint | Resposta | Descrição |
 | --- | --- | --- | --- |
-| `GET` | `/api/health` | ✅ `200` | Verificação de disponibilidade |
-| `POST` | `/api/authorizations` | 🚧 `404` | Registrar opt-in do beneficiário |
-| `GET` | `/api/beneficiaries/{beneficiaryId}/agenda` | 🚧 `404` | Listar parcelas elegíveis |
-| `POST` | `/api/portability` | 🚧 `404` | Iniciar operação de portabilidade |
-| `GET` | `/api/portability/{operationId}` | 🚧 `404` | Consultar status da operação |
-| `GET` | `/api/portability/{operationId}/audit` | 🚧 `404` | Consultar trilha de eventos |
+| `GET` | `/api/health` | `200` | Verificação de disponibilidade |
+| `POST` | `/api/authorizations` | `201`, `200` (reenvio), `400`, `502` | Registrar opt-in do beneficiário |
+| `GET` | `/api/beneficiaries/{beneficiaryId}/agenda` | `404` | Listar parcelas elegíveis |
+| `POST` | `/api/portability` | `404` | Iniciar operação de portabilidade |
+| `GET` | `/api/portability/{operationId}` | `404` | Consultar status da operação |
+| `GET` | `/api/portability/{operationId}/audit` | `404` | Consultar trilha de eventos |
 
-Exemplo de resposta implementada:
-
-```json
-{ "status": "UP", "service": "portability-backend" }
-```
-
-DTOs já definidos no frontend (`frontend/src/types/index.ts`) para o contrato planejado — nomes em inglês:
-
-```json
-// AuthorizeRequest
-{ "beneficiaryId": "BEN-123", "agreementId": "AGR-001" }
-
-// PortabilityRequest
-{
-  "beneficiaryId": "BEN-123",
-  "installments": ["INS-1", "INS-2"],
-  "creditorAssignee": "Nova Credora S.A.",
-  "receivingAccount": { "bank": "001", "agency": "1234", "account": "56789-0" }
-}
-```
 
 ### Central de Convênios simulada (`/central`)
 
-Contrato mínimo sugerido pelo PDF. Os quatro endpoints existem, mas retornam `501 Not Implemented`:
+Contrato mínimo sugerido pelo PDF. O registro de autorização está implementado; os demais endpoints
+continuam como stub (`501 Not Implemented`).
 
-| Método | Endpoint | Hoje | Contrato previsto |
+| Método | Endpoint | Resposta | Descrição |
 | --- | --- | --- | --- |
-| `POST` | `/central/autorizacoes` | `501` | `201 Created` com identificador da autorização |
-| `GET` | `/central/beneficiarios/{beneficiaryId}/agenda` | `501` | `200` com lista de parcelas |
-| `POST` | `/central/operacoes-portabilidade` | `501` | `202 Accepted` com `{ "protocolo": "..." }` |
-| `GET` | `/central/operacoes-portabilidade/{protocol}` | `501` | `200` com status ou `204` + `Retry-After` enquanto pendente |
+| `POST` | `/central/autorizacoes` | `201`, `400`, `401` | Registrar autorização; `201` devolve `{ "autorizacaoId": "..." }` |
+| `GET` | `/central/beneficiarios/{beneficiaryId}/agenda` | `501` | Listar parcelas |
+| `POST` | `/central/operacoes-portabilidade` | `501` | Registrar operação com `{ "protocolo": "..." }` |
+| `GET` | `/central/operacoes-portabilidade/{protocol}` | `501` | Consultar status ou `204` + `Retry-After` enquanto pendente |
+
+`POST /central/autorizacoes` exige o cabeçalho `X-Signature`: HMAC-SHA256 em Base64 do corpo exato da
+requisição, calculado com `central.hmac-secret` (`CENTRAL_HMAC_SECRET`). Assinatura ausente ou inválida
+responde `401`; payload com campos em branco responde `400`.
 
 Payloads da Central (pt-BR, conforme o PDF):
 
 ```json
 // POST /central/autorizacoes
 { "beneficiarioId": "BEN-123", "convenioId": "AGR-001" }
+// resposta 201
+{ "autorizacaoId": "AUT-3f4b..." }
 
 // POST /central/operacoes-portabilidade
 {
@@ -236,41 +219,6 @@ Payloads da Central (pt-BR, conforme o PDF):
 A conversão entre esses nomes e o modelo interno em inglês fica em `adapters/out/central` (detalhes em
 [`docs/lld.md`](docs/lld.md), seção "Mapeamento com a Central").
 
-### Exemplos de utilização
-
-Verificar que o backend está no ar:
-
-```bash
-curl -i http://localhost:8080/api/health
-# HTTP/1.1 200
-# {"status":"UP","service":"portability-backend"}
-```
-
-Confirmar que a Central mockada está no ar (o `501` é o comportamento atual esperado):
-
-```bash
-curl -i -X POST http://localhost:8080/central/autorizacoes \
-  -H 'Content-Type: application/json' \
-  -d '{"beneficiarioId":"BEN-123","convenioId":"AGR-001"}'
-# HTTP/1.1 501
-```
-
-Abrir a interface:
-
-```bash
-cd frontend && npm run dev
-# navegue para http://localhost:5173
-```
-
-Exemplo previsto para quando os casos de uso forem implementados (ainda não funciona):
-
-```bash
-curl -X POST http://localhost:8080/api/authorizations \
-  -H 'Content-Type: application/json' \
-  -d '{"beneficiaryId":"BEN-123","agreementId":"AGR-001"}'
-```
-
----
 
 ## Modelo de dados
 

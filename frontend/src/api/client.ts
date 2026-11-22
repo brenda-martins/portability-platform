@@ -11,7 +11,16 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
   });
 
   if (!response.ok) {
-    throw new Error(`Request failed: ${response.status} ${response.statusText}`);
+    let message = `Request failed: ${response.status} ${response.statusText}`;
+    try {
+      const body = (await response.json()) as { message?: unknown };
+      if (typeof body.message === 'string' && body.message) {
+        message = body.message;
+      }
+    } catch {
+      // Keeps the HTTP status message when the error body is not JSON.
+    }
+    throw new Error(message);
   }
 
   return (await response.json()) as T;

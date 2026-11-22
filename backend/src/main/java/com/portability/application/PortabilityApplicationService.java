@@ -2,6 +2,7 @@ package com.portability.application;
 
 import com.portability.domain.model.AuditEvent;
 import com.portability.domain.model.Authorization;
+import com.portability.domain.model.AuthorizationResult;
 import com.portability.domain.model.DiscountInstallment;
 import com.portability.domain.model.PortabilityOperation;
 import com.portability.domain.model.ReceivingAccount;
@@ -12,18 +13,19 @@ import com.portability.domain.ports.in.RegisterAuthorizationUseCase;
 import com.portability.domain.ports.in.StartPortabilityUseCase;
 import com.portability.domain.ports.out.AuditEventRepository;
 import com.portability.domain.ports.out.AuthorizationRepository;
+import com.portability.domain.ports.out.CentralAuthorizationPort;
 import com.portability.domain.ports.out.CentralPortabilityPort;
 import com.portability.domain.ports.out.DiscountAgendaPort;
 import com.portability.domain.ports.out.OperationRepository;
 import com.portability.domain.ports.out.SignaturePort;
 import org.springframework.stereotype.Service;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
 /**
  * Application layer: orchestrates the use cases using only domain ports.
- * Methods are intentionally left as stubs in this initial scaffold.
  */
 @Service
 public class PortabilityApplicationService implements RegisterAuthorizationUseCase, GetDiscountAgendaUseCase,
@@ -34,6 +36,7 @@ public class PortabilityApplicationService implements RegisterAuthorizationUseCa
     private final AuditEventRepository auditEventRepository;
     private final DiscountAgendaPort discountAgendaPort;
     private final CentralPortabilityPort centralPortabilityPort;
+    private final CentralAuthorizationPort centralAuthorizationPort;
     private final SignaturePort signaturePort;
 
     public PortabilityApplicationService(
@@ -42,6 +45,7 @@ public class PortabilityApplicationService implements RegisterAuthorizationUseCa
             AuditEventRepository auditEventRepository,
             DiscountAgendaPort discountAgendaPort,
             CentralPortabilityPort centralPortabilityPort,
+            CentralAuthorizationPort centralAuthorizationPort,
             SignaturePort signaturePort
     ) {
         this.authorizationRepository = authorizationRepository;
@@ -49,13 +53,31 @@ public class PortabilityApplicationService implements RegisterAuthorizationUseCa
         this.auditEventRepository = auditEventRepository;
         this.discountAgendaPort = discountAgendaPort;
         this.centralPortabilityPort = centralPortabilityPort;
+        this.centralAuthorizationPort = centralAuthorizationPort;
         this.signaturePort = signaturePort;
     }
 
     @Override
-    public Authorization registerAuthorization(String beneficiaryId, String agreementId) {
-        // TODO: validate opt-in, persist the authorization and register it in the Central.
-        throw new UnsupportedOperationException("TODO: registerAuthorization");
+    public AuthorizationResult registerAuthorization(String beneficiaryId, String agreementId) {
+        requireNotBlank(beneficiaryId, "beneficiaryId");
+        requireNotBlank(agreementId, "agreementId");
+
+        Optional<Authorization> existing =
+                authorizationRepository.findByBeneficiaryAndAgreement(beneficiaryId, agreementId);
+        if (existing.isPresent()) {
+            return new AuthorizationResult(existing.get(), false);
+        }
+
+        String authorizationId = centralAuthorizationPort.registerAuthorization(beneficiaryId, agreementId);
+        Authorization authorization =
+                new Authorization(authorizationId, beneficiaryId, agreementId, Instant.now());
+        return new AuthorizationResult(authorizationRepository.save(authorization), true);
+    }
+
+    private static void requireNotBlank(String value, String field) {
+        if (value == null || value.isBlank()) {
+            throw new IllegalArgumentException(field + " must not be blank");
+        }
     }
 
     @Override

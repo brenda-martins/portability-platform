@@ -1,8 +1,8 @@
 package com.portability.domain.ports.in;
 
-import com.portability.domain.model.Authorization;
+import com.portability.domain.model.AuthorizationResult;
 
 public interface RegisterAuthorizationUseCase {
 
-    Authorization registerAuthorization(String beneficiaryId, String agreementId);
+    AuthorizationResult registerAuthorization(String beneficiaryId, String agreementId);
 }

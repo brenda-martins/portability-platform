@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { apiFetch } from '../../api/client';
-import type { Authorization } from '../../types';
+import type { Authorization, AuthorizeRequest } from '../../types';
 
 interface AuthorizationPanelProps {
   onAuthorized: (authorization: Authorization) => void;
@@ -20,9 +20,10 @@ export function AuthorizationPanel({ onAuthorized }: AuthorizationPanelProps) {
     setConfirmation(null);
 
     try {
+      const request: AuthorizeRequest = { beneficiaryId, agreementId };
       const authorization = await apiFetch<Authorization>('/authorizations', {
         method: 'POST',
-        body: JSON.stringify({ beneficiaryId, agreementId }),
+        body: JSON.stringify(request),
       });
       onAuthorized(authorization);
       setConfirmation(`Autorização registrada: ${authorization.authorizationId}`);

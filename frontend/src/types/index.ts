@@ -9,6 +9,7 @@ export interface Authorization {
   authorizationId: string;
   beneficiaryId: string;
   agreementId: string;
+  createdAt: string;
 }
 
 export interface DiscountInstallment {

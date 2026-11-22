@@ -17,13 +17,25 @@ public class AuthorizationRepositoryAdapter implements AuthorizationRepository {
 
     @Override
     public Authorization save(Authorization authorization) {
-        // TODO: map to/from AuthorizationJpaEntity and persist.
-        throw new UnsupportedOperationException("TODO: save authorization");
+        AuthorizationJpaEntity entity = new AuthorizationJpaEntity();
+        entity.setAuthorizationId(authorization.authorizationId());
+        entity.setBeneficiaryId(authorization.beneficiaryId());
+        entity.setAgreementId(authorization.agreementId());
+        entity.setCreatedAt(authorization.createdAt());
+        return toDomain(repository.save(entity));
     }
 
     @Override
     public Optional<Authorization> findByBeneficiaryAndAgreement(String beneficiaryId, String agreementId) {
-        // TODO: query and map to the domain model.
-        throw new UnsupportedOperationException("TODO: find authorization");
+        return repository.findByBeneficiaryIdAndAgreementId(beneficiaryId, agreementId)
+                .map(AuthorizationRepositoryAdapter::toDomain);
+    }
+
+    private static Authorization toDomain(AuthorizationJpaEntity entity) {
+        return new Authorization(
+                entity.getAuthorizationId(),
+                entity.getBeneficiaryId(),
+                entity.getAgreementId(),
+                entity.getCreatedAt());
     }
 }

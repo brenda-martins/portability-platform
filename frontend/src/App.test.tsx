@@ -12,6 +12,7 @@ const authorization: Authorization = {
   authorizationId: 'AUT-1',
   beneficiaryId: 'BEN-123',
   agreementId: 'AGR-001',
+  createdAt: '2026-11-22T12:34:56Z',
 };
 
 const installments: DiscountInstallment[] = [
@@ -111,14 +112,25 @@ describe('App', () => {
   });
 
   it('deve exibir a falha da API quando a autorização retorna erro', async () => {
-    mockedApiFetch.mockRejectedValue(new Error('Request failed: 404'));
+    mockedApiFetch.mockRejectedValue(new Error('Request failed: 502'));
     render(<App />);
 
     fillAuthorizationForm();
     fireEvent.click(screen.getByRole('button', { name: /autorizar/i }));
 
     const alert = await screen.findByRole('alert');
-    expect(alert.textContent).toContain('404');
+    expect(alert.textContent).toContain('502');
+  });
+
+  it('deve exibir a mensagem devolvida pela API quando a autorização falha', async () => {
+    mockedApiFetch.mockRejectedValue(new Error('Central indisponível'));
+    render(<App />);
+
+    fillAuthorizationForm();
+    fireEvent.click(screen.getByRole('button', { name: /autorizar/i }));
+
+    const alert = await screen.findByRole('alert');
+    expect(alert.textContent).toContain('Central indisponível');
   });
 
   it('deve habilitar a agenda somente depois da autorização', async () => {

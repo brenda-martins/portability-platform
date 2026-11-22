@@ -14,6 +14,7 @@ Records imutáveis em `domain/model`, todos sem anotações de framework:
 | --- | --- |
 | `Beneficiary` | `beneficiaryId`, `name` |
 | `Authorization` | `authorizationId`, `beneficiaryId`, `agreementId`, `createdAt` |
+| `AuthorizationResult` | `authorization`, `created` |
 | `DiscountInstallment` | `installmentId`, `agreementId`, `amount` (`BigDecimal`), `discountDate` (`LocalDate`), `status` |
 | `ReceivingAccount` | `bank`, `agency`, `account` |
 | `PortabilityOperation` | `operationId`, `beneficiaryId`, `installmentIds`, `creditorAssignee`, `receivingAccount`, `status`, `protocol`, `rejectionReason`, `requestedAt` |
@@ -29,7 +30,7 @@ Enums: `OperationStatus` (`PENDING`, `CONFIRMED`, `REJECTED`), `InstallmentStatu
 
 | Port | Método |
 | --- | --- |
-| `RegisterAuthorizationUseCase` | `registerAuthorization(beneficiaryId, agreementId): Authorization` |
+| `RegisterAuthorizationUseCase` | `registerAuthorization(beneficiaryId, agreementId): AuthorizationResult` |
 | `GetDiscountAgendaUseCase` | `getAgenda(beneficiaryId): List<DiscountInstallment>` |
 | `StartPortabilityUseCase` | `startPortability(beneficiaryId, installmentIds, creditorAssignee, receivingAccount): PortabilityOperation` |
 | `GetOperationStatusUseCase` | `getOperationStatus(operationId): Optional<PortabilityOperation>` |
@@ -40,6 +41,7 @@ Enums: `OperationStatus` (`PENDING`, `CONFIRMED`, `REJECTED`), `InstallmentStatu
 | Port | Implementado por | Finalidade |
 | --- | --- | --- |
 | `AuthorizationRepository` | `AuthorizationRepositoryAdapter` | salvar/buscar autorização por beneficiário e convênio |
+| `CentralAuthorizationPort` | `CentralClient` | montar payload/HMAC, registrar o opt-in na Central e devolver o `autorizacaoId` |
 | `OperationRepository` | `OperationRepositoryAdapter` | salvar/buscar operação por id e por protocolo (idempotência) |
 | `AuditEventRepository` | `AuditEventRepositoryAdapter` | anexar eventos e listar por operação |
 | `DiscountAgendaPort` | `CentralClient` | buscar agenda na Central |
@@ -56,6 +58,7 @@ A tradução acontece em `adapters/out/central`:
 | --- | --- |
 | `beneficiaryId` | `beneficiarioId` |
 | `agreementId` | `convenioId` |
+| `authorizationId` | `autorizacaoId` |
 | `installmentId` | `parcelaId` |
 | `amount` | `valor` |
 | `discountDate` | `dataDesconto` |
@@ -81,8 +84,13 @@ A tradução acontece em `adapters/out/central`:
 
 ## Integração, idempotência e erros
 
-- `CentralClient`: chamadas HTTP com timeout, assinatura HMAC enviada no payload/header e leitura de
-  `Retry-After`; protocolo `202` e consulta de status com backoff.
+- Opt-in: antes de chamar a Central, `findByBeneficiaryAndAgreement` devolve a autorização existente;
+  o reenvio não cria duplicata nem repete a chamada. A autorização nova usa o `autorizacaoId` devolvido
+  pela Central e `createdAt` gerado na aplicação.
+- `CentralClient`: chamadas HTTP com timeout, assinatura HMAC enviada no header `X-Signature` sobre o
+  corpo exato e leitura de `Retry-After`; protocolo `202` e consulta de status com backoff.
+- A Central valida a assinatura do opt-in: `201` com `autorizacaoId`, `400` para payload inválido e `401`
+  para assinatura ausente/inválida. Na API, falha de integração com a Central vira `502`.
 - `HmacSignatureService`: HMAC-SHA256 em Base64 com segredo de `central.hmac-secret`; verificação em
   tempo constante.
 - Idempotência: gerar chave estável a partir de beneficiário + convênio + parcelas + conta; antes de
