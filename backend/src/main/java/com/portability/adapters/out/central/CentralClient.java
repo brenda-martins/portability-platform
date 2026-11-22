@@ -35,7 +35,6 @@ public class CentralClient implements DiscountAgendaPort, CentralPortabilityPort
 
     private final RestClient restClient;
     private final CentralRequestCodec codec;
-    private final ObjectMapper objectMapper;
 
     @Autowired
     public CentralClient(CentralProperties properties, CentralRequestCodec codec, ObjectMapper objectMapper) {
@@ -57,7 +56,6 @@ public class CentralClient implements DiscountAgendaPort, CentralPortabilityPort
                 .requestFactory(requestFactory)
                 .build();
         this.codec = codec;
-        this.objectMapper = objectMapper;
     }
 
     @Override
@@ -97,25 +95,6 @@ public class CentralClient implements DiscountAgendaPort, CentralPortabilityPort
             return Arrays.stream(items).map(CentralClient::toDomain).toList();
         } catch (RestClientException | JacksonException exception) {
             throw new CentralUnavailableException("Central indisponível", exception);
-        }
-    }
-
-    private static DiscountInstallment toDomain(CentralInstallment item) {
-        if (item == null || isBlank(item.parcelaId()) || isBlank(item.convenioId())
-                || item.valor() == null || isBlank(item.dataDesconto()) || isBlank(item.status())) {
-            throw new CentralUnavailableException("Resposta inesperada da Central");
-        }
-        InstallmentStatus status = switch (item.status()) {
-            case "ABERTA" -> InstallmentStatus.OPEN;
-            case "PORTADA" -> InstallmentStatus.PORTED;
-            case "CANCELADA" -> InstallmentStatus.CANCELLED;
-            default -> throw new CentralUnavailableException("Resposta inesperada da Central");
-        };
-        try {
-            return new DiscountInstallment(item.parcelaId(), item.convenioId(), item.valor(),
-                    LocalDate.parse(item.dataDesconto()), status);
-        } catch (DateTimeParseException exception) {
-            throw new CentralUnavailableException("Resposta inesperada da Central", exception);
         }
     }
 
@@ -202,6 +181,25 @@ public class CentralClient implements DiscountAgendaPort, CentralPortabilityPort
         }
     }
 
+    private static DiscountInstallment toDomain(CentralInstallment item) {
+        if (item == null || isBlank(item.parcelaId()) || isBlank(item.convenioId())
+                || item.valor() == null || isBlank(item.dataDesconto()) || isBlank(item.status())) {
+            throw new CentralUnavailableException("Resposta inesperada da Central");
+        }
+        InstallmentStatus status = switch (item.status()) {
+            case "ABERTA" -> InstallmentStatus.OPEN;
+            case "PORTADA" -> InstallmentStatus.PORTED;
+            case "CANCELADA" -> InstallmentStatus.CANCELLED;
+            default -> throw new CentralUnavailableException("Resposta inesperada da Central");
+        };
+        try {
+            return new DiscountInstallment(item.parcelaId(), item.convenioId(), item.valor(),
+                    LocalDate.parse(item.dataDesconto()), status);
+        } catch (DateTimeParseException exception) {
+            throw new CentralUnavailableException("Resposta inesperada da Central", exception);
+        }
+    }
+
     private static Duration retryAfter(ResponseEntity<?> response) {
         String header = response.getHeaders().getFirst(HttpHeaders.RETRY_AFTER);
         if (header == null || header.isBlank()) {
@@ -231,6 +229,6 @@ public class CentralClient implements DiscountAgendaPort, CentralPortabilityPort
     }
 
     private record CentralInstallment(String parcelaId, String convenioId, BigDecimal valor,
-                                      String dataDesconto, String status) {
+            String dataDesconto, String status) {
     }
 }
