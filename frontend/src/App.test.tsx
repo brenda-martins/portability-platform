@@ -157,6 +157,42 @@ describe('App', () => {
     });
   });
 
+  it('deve exibir convênio, valor, data e status das parcelas consultadas', async () => {
+    respondByPath({ '/authorizations': authorization });
+    render(<App />);
+    await authorize();
+    respondWith(installments);
+    fireEvent.click(screen.getByRole('button', { name: /consultar agenda/i }));
+    await screen.findByText(/INS-1/);
+
+    const row = screen.getByText(/INS-1/).closest('tr');
+    expect(row?.textContent).toContain('AGR-001');
+    expect(row?.textContent).toContain('120,50');
+    expect(row?.textContent).toContain('2099-01-10');
+    expect(row?.textContent).toContain('OPEN');
+  });
+
+  it('deve exibir estado vazio quando a agenda não tem parcelas', async () => {
+    respondByPath({ '/authorizations': authorization });
+    render(<App />);
+    await authorize();
+    respondWith([]);
+    fireEvent.click(screen.getByRole('button', { name: /consultar agenda/i }));
+
+    expect(await screen.findByText(/nenhuma parcela futura disponível/i)).toBeTruthy();
+  });
+
+  it('deve exibir a mensagem de erro da API quando a consulta da agenda falha', async () => {
+    respondByPath({ '/authorizations': authorization });
+    render(<App />);
+    await authorize();
+    mockedApiFetch.mockRejectedValueOnce(new Error('Beneficiário não autorizado'));
+    fireEvent.click(screen.getByRole('button', { name: /consultar agenda/i }));
+
+    const alert = await screen.findByRole('alert');
+    expect(alert.textContent).toContain('Beneficiário não autorizado');
+  });
+
   it('deve permitir selecionar apenas parcelas abertas e futuras', async () => {
     respondByPath({ '/authorizations': authorization });
     render(<App />);
@@ -238,7 +274,9 @@ describe('App', () => {
     fireEvent.click(screen.getByRole('button', { name: /registrar portabilidade/i }));
     await screen.findByText(/PRT-1/);
 
-    fireEvent.click(screen.getByRole('button', { name: /consultar auditoria/i }));
+    const auditButton = screen.getByRole('button', { name: /consultar auditoria/i }) as HTMLButtonElement;
+    await waitFor(() => expect(auditButton.disabled).toBe(false));
+    fireEvent.click(auditButton);
 
     expect(await screen.findByText('Operação solicitada')).toBeTruthy();
   });

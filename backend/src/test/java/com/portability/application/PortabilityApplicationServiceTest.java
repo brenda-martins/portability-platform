@@ -2,6 +2,9 @@ package com.portability.application;
 
 import com.portability.domain.model.Authorization;
 import com.portability.domain.model.AuthorizationResult;
+import com.portability.domain.model.BeneficiaryNotAuthorizedException;
+import com.portability.domain.model.DiscountInstallment;
+import com.portability.domain.model.InstallmentStatus;
 import com.portability.domain.ports.out.AuditEventRepository;
 import com.portability.domain.ports.out.AuthorizationRepository;
 import com.portability.domain.ports.out.CentralAuthorizationPort;
@@ -16,7 +19,10 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -109,5 +115,45 @@ class PortabilityApplicationServiceTest {
 
         assertEquals("Central indisponível", error.getMessage());
         verify(authorizationRepository, never()).save(any());
+    }
+
+    @Test
+    void shouldReturnFullAgendaWhenBeneficiaryIsAuthorized() {
+        DiscountInstallment open = new DiscountInstallment("INS-1", AGREEMENT_ID,
+                new BigDecimal("120.50"), LocalDate.parse("2099-01-10"), InstallmentStatus.OPEN);
+        DiscountInstallment ported = new DiscountInstallment("INS-3", AGREEMENT_ID,
+                new BigDecimal("60.00"), LocalDate.parse("2099-02-10"), InstallmentStatus.PORTED);
+        when(authorizationRepository.existsByBeneficiaryId(BENEFICIARY_ID)).thenReturn(true);
+        when(discountAgendaPort.fetchAgenda(BENEFICIARY_ID)).thenReturn(List.of(open, ported));
+
+        List<DiscountInstallment> agenda = service.getAgenda(BENEFICIARY_ID);
+
+        assertEquals(List.of(open, ported), agenda);
+        verify(discountAgendaPort).fetchAgenda(BENEFICIARY_ID);
+    }
+
+    @Test
+    void mustRejectAgendaWhenBeneficiaryIsNotAuthorized() {
+        when(authorizationRepository.existsByBeneficiaryId(BENEFICIARY_ID)).thenReturn(false);
+
+        assertThrows(BeneficiaryNotAuthorizedException.class, () -> service.getAgenda(BENEFICIARY_ID));
+
+        verifyNoInteractions(discountAgendaPort);
+    }
+
+    @Test
+    void mustRejectBlankBeneficiaryWithoutCallingCentralForAgenda() {
+        assertThrows(IllegalArgumentException.class, () -> service.getAgenda(" "));
+
+        verifyNoInteractions(authorizationRepository, discountAgendaPort);
+    }
+
+    @Test
+    void mustPropagateCentralFailureWithoutPartialAgenda() {
+        when(authorizationRepository.existsByBeneficiaryId(BENEFICIARY_ID)).thenReturn(true);
+        when(discountAgendaPort.fetchAgenda(BENEFICIARY_ID))
+                .thenThrow(new CentralUnavailableException("Central indisponível"));
+
+        assertThrows(CentralUnavailableException.class, () -> service.getAgenda(BENEFICIARY_ID));
     }
 }

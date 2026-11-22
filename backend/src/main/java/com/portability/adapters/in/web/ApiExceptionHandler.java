@@ -1,5 +1,6 @@
 package com.portability.adapters.in.web;
 
+import com.portability.domain.model.BeneficiaryNotAuthorizedException;
 import com.portability.domain.ports.out.CentralUnavailableException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -22,6 +23,12 @@ public class ApiExceptionHandler {
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<Map<String, String>> handleIllegalArgument(IllegalArgumentException exception) {
         return ResponseEntity.badRequest().body(Map.of("message", exception.getMessage()));
+    }
+
+    @ExceptionHandler(BeneficiaryNotAuthorizedException.class)
+    public ResponseEntity<Map<String, String>> handleNotAuthorized(BeneficiaryNotAuthorizedException exception) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(Map.of("message", exception.getMessage()));
     }
 
     @ExceptionHandler(CentralUnavailableException.class)

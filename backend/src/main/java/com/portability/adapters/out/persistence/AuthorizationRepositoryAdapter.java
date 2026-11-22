@@ -31,6 +31,11 @@ public class AuthorizationRepositoryAdapter implements AuthorizationRepository {
                 .map(AuthorizationRepositoryAdapter::toDomain);
     }
 
+    @Override
+    public boolean existsByBeneficiaryId(String beneficiaryId) {
+        return repository.existsByBeneficiaryId(beneficiaryId);
+    }
+
     private static Authorization toDomain(AuthorizationJpaEntity entity) {
         return new Authorization(
                 entity.getAuthorizationId(),

@@ -3,6 +3,7 @@ package com.portability.application;
 import com.portability.domain.model.AuditEvent;
 import com.portability.domain.model.Authorization;
 import com.portability.domain.model.AuthorizationResult;
+import com.portability.domain.model.BeneficiaryNotAuthorizedException;
 import com.portability.domain.model.DiscountInstallment;
 import com.portability.domain.model.PortabilityOperation;
 import com.portability.domain.model.ReceivingAccount;
@@ -74,16 +75,15 @@ public class PortabilityApplicationService implements RegisterAuthorizationUseCa
         return new AuthorizationResult(authorizationRepository.save(authorization), true);
     }
 
-    private static void requireNotBlank(String value, String field) {
-        if (value == null || value.isBlank()) {
-            throw new IllegalArgumentException(field + " must not be blank");
-        }
-    }
+   
 
     @Override
     public List<DiscountInstallment> getAgenda(String beneficiaryId) {
-        // TODO: check authorization before fetching the agenda from the Central.
-        throw new UnsupportedOperationException("TODO: getAgenda");
+        requireNotBlank(beneficiaryId, "beneficiaryId");
+        if (!authorizationRepository.existsByBeneficiaryId(beneficiaryId)) {
+            throw new BeneficiaryNotAuthorizedException("Beneficiário não autorizado");
+        }
+        return discountAgendaPort.fetchAgenda(beneficiaryId);
     }
 
     @Override

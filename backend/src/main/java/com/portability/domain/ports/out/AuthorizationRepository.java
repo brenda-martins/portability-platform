@@ -9,4 +9,6 @@ public interface AuthorizationRepository {
     Authorization save(Authorization authorization);
 
     Optional<Authorization> findByBeneficiaryAndAgreement(String beneficiaryId, String agreementId);
+
+    boolean existsByBeneficiaryId(String beneficiaryId);
 }

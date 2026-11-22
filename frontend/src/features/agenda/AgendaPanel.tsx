@@ -80,6 +80,7 @@ export function AgendaPanel({
             <tr>
               <th>Selecionar</th>
               <th>Parcela</th>
+              <th>Convênio</th>
               <th>Data</th>
               <th>Valor</th>
               <th>Status</th>
@@ -98,6 +99,7 @@ export function AgendaPanel({
                   />
                 </td>
                 <td>{installment.installmentId}</td>
+                <td>{installment.agreementId}</td>
                 <td>{installment.discountDate}</td>
                 <td>{currency.format(installment.amount)}</td>
                 <td>{installment.status}</td>

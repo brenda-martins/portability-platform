@@ -14,6 +14,8 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.math.BigDecimal;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -58,8 +60,28 @@ public class MockCentralController {
     }
 
     @GetMapping("/beneficiarios/{beneficiaryId}/agenda")
-    public ResponseEntity<Void> getAgenda(@PathVariable String beneficiaryId) {
-        return ResponseEntity.status(HttpStatus.NOT_IMPLEMENTED).build();
+    public ResponseEntity<List<Map<String, Object>>> getAgenda(@PathVariable String beneficiaryId) {
+        return ResponseEntity.ok(agendaFor(beneficiaryId));
+    }
+
+    private static List<Map<String, Object>> agendaFor(String beneficiaryId) {
+        if (!"BEN-123".equals(beneficiaryId)) {
+            return List.of();
+        }
+        return List.of(
+                installment("INS-1", "AGR-001", "120.50", "2099-01-10", "ABERTA"),
+                installment("INS-2", "AGR-001", "80.00", "2020-01-10", "ABERTA"),
+                installment("INS-3", "AGR-001", "60.00", "2099-02-10", "PORTADA"));
+    }
+
+    private static Map<String, Object> installment(
+            String parcelaId, String convenioId, String valor, String dataDesconto, String status) {
+        return Map.of(
+                "parcelaId", parcelaId,
+                "convenioId", convenioId,
+                "valor", new BigDecimal(valor),
+                "dataDesconto", dataDesconto,
+                "status", status);
     }
 
     @PostMapping("/operacoes-portabilidade")

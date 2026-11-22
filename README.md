@@ -173,7 +173,7 @@ Ver [`AGENTS.md`](AGENTS.md), seção "Agentes e skills".
 | --- | --- | --- | --- |
 | `GET` | `/api/health` | `200` | Verificação de disponibilidade |
 | `POST` | `/api/authorizations` | `201`, `200` (reenvio), `400`, `502` | Registrar opt-in do beneficiário |
-| `GET` | `/api/beneficiaries/{beneficiaryId}/agenda` | `404` | Listar parcelas elegíveis |
+| `GET` | `/api/beneficiaries/{beneficiaryId}/agenda` | `200`, `400`, `403`, `502` | Listar parcelas da agenda de beneficiário autorizado |
 | `POST` | `/api/portability` | `404` | Iniciar operação de portabilidade |
 | `GET` | `/api/portability/{operationId}` | `404` | Consultar status da operação |
 | `GET` | `/api/portability/{operationId}/audit` | `404` | Consultar trilha de eventos |
@@ -181,13 +181,11 @@ Ver [`AGENTS.md`](AGENTS.md), seção "Agentes e skills".
 
 ### Central de Convênios simulada (`/central`)
 
-Contrato mínimo sugerido pelo PDF. O registro de autorização está implementado; os demais endpoints
-continuam como stub (`501 Not Implemented`).
 
 | Método | Endpoint | Resposta | Descrição |
 | --- | --- | --- | --- |
 | `POST` | `/central/autorizacoes` | `201`, `400`, `401` | Registrar autorização; `201` devolve `{ "autorizacaoId": "..." }` |
-| `GET` | `/central/beneficiarios/{beneficiaryId}/agenda` | `501` | Listar parcelas |
+| `GET` | `/central/beneficiarios/{beneficiaryId}/agenda` | `200` | Listar parcelas (fixture fixa por beneficiário) |
 | `POST` | `/central/operacoes-portabilidade` | `501` | Registrar operação com `{ "protocolo": "..." }` |
 | `GET` | `/central/operacoes-portabilidade/{protocol}` | `501` | Consultar status ou `204` + `Retry-After` enquanto pendente |
 
@@ -203,6 +201,18 @@ Payloads da Central (pt-BR, conforme o PDF):
 // resposta 201
 { "autorizacaoId": "AUT-3f4b..." }
 
+// GET /central/beneficiarios/BEN-123/agenda
+[
+  { "parcelaId": "INS-1", "convenioId": "AGR-001", "valor": 120.5,
+    "dataDesconto": "2099-01-10", "status": "ABERTA" }
+]
+
+// GET /api/beneficiaries/BEN-123/agenda
+[
+  { "installmentId": "INS-1", "agreementId": "AGR-001", "amount": 120.5,
+    "discountDate": "2099-01-10", "status": "OPEN" }
+]
+
 // POST /central/operacoes-portabilidade
 {
   "beneficiarioId": "BEN-123",
@@ -216,7 +226,8 @@ Payloads da Central (pt-BR, conforme o PDF):
 { "status": "CONFIRMADA", "motivoRejeicao": null }
 ```
 
-A conversão entre esses nomes e o modelo interno em inglês fica em `adapters/out/central` (detalhes em
+A agenda exige uma autorização registrada para o beneficiário; sem ela, a API responde `403`. A
+conversão entre esses nomes e o modelo interno em inglês fica em `adapters/out/central` (detalhes em
 [`docs/lld.md`](docs/lld.md), seção "Mapeamento com a Central").
 
 

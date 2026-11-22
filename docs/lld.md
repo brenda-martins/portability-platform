@@ -21,6 +21,8 @@ Records imutáveis em `domain/model`, todos sem anotações de framework:
 | `AuditEvent` | `eventId`, `operationId`, `eventType`, `message`, `occurredAt` |
 | `CentralOperationStatus` | `status`, `rejectionReason` |
 
+`Authorization` e `DiscountInstallment` validam campos obrigatórios no construtor.
+
 Enums: `OperationStatus` (`PENDING`, `CONFIRMED`, `REJECTED`), `InstallmentStatus` (`OPEN`, `PORTED`,
 `CANCELLED`).
 
@@ -40,7 +42,7 @@ Enums: `OperationStatus` (`PENDING`, `CONFIRMED`, `REJECTED`), `InstallmentStatu
 
 | Port | Implementado por | Finalidade |
 | --- | --- | --- |
-| `AuthorizationRepository` | `AuthorizationRepositoryAdapter` | salvar/buscar autorização por beneficiário e convênio |
+| `AuthorizationRepository` | `AuthorizationRepositoryAdapter` | salvar/buscar autorização por beneficiário e convênio; verificar existência por beneficiário |
 | `CentralAuthorizationPort` | `CentralClient` | montar payload/HMAC, registrar o opt-in na Central e devolver o `autorizacaoId` |
 | `OperationRepository` | `OperationRepositoryAdapter` | salvar/buscar operação por id e por protocolo (idempotência) |
 | `AuditEventRepository` | `AuditEventRepositoryAdapter` | anexar eventos e listar por operação |
@@ -87,6 +89,12 @@ A tradução acontece em `adapters/out/central`:
 - Opt-in: antes de chamar a Central, `findByBeneficiaryAndAgreement` devolve a autorização existente;
   o reenvio não cria duplicata nem repete a chamada. A autorização nova usa o `autorizacaoId` devolvido
   pela Central e `createdAt` gerado na aplicação.
+- Agenda: `getAgenda` exige ao menos uma autorização do beneficiário (`existsByBeneficiaryId`); sem ela,
+  `BeneficiaryNotAuthorizedException` vira `403` e a Central não é chamada. `CentralClient.fetchAgenda`
+  traduz `parcelaId`/`convenioId`/`valor`/`dataDesconto`/`status` e devolve a lista completa, sem filtro
+  de elegibilidade; status HTTP diferente de `200`, corpo ausente/inválido, data fora de `AAAA-MM-DD` ou
+  status desconhecido viram `CentralUnavailableException` (`502`). O `GET` da agenda não envia corpo nem
+  assinatura, e a fixture da Central é fixa por beneficiário.
 - `CentralClient`: chamadas HTTP com timeout, assinatura HMAC enviada no header `X-Signature` sobre o
   corpo exato e leitura de `Retry-After`; protocolo `202` e consulta de status com backoff.
 - A Central valida a assinatura do opt-in: `201` com `autorizacaoId`, `400` para payload inválido e `401`
