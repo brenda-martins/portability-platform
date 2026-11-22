@@ -42,7 +42,7 @@ export function AuthorizationPanel({ onAuthorized }: AuthorizationPanelProps) {
     <section className="panel">
       <PanelHeader
         step={1}
-        title="Autorização (opt-in)"
+        title="Autorização"
         description="Permita a consulta da agenda deste beneficiário."
       />
       <form onSubmit={handleSubmit}>

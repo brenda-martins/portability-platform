@@ -28,6 +28,7 @@ import com.portability.domain.ports.out.DiscountAgendaPort;
 import com.portability.domain.ports.out.OperationRepository;
 import com.portability.domain.ports.out.SignaturePort;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -89,6 +90,7 @@ public class PortabilityApplicationService implements
     }
 
     @Override
+    @Transactional
     public AuthorizationResult registerAuthorization(String beneficiaryId, String agreementId) {
         requireNotBlank(beneficiaryId, "beneficiaryId");
         requireNotBlank(agreementId, "agreementId");
@@ -114,6 +116,7 @@ public class PortabilityApplicationService implements
     }
 
     @Override
+    @Transactional
     public PortabilityOperationResult startPortability(
             String beneficiaryId,
             List<String> installmentIds,
@@ -159,6 +162,7 @@ public class PortabilityApplicationService implements
     }
 
     @Override
+    @Transactional
     public Optional<PortabilityOperation> getOperationStatus(String operationId) {
         requireNotBlank(operationId, "operationId");
         return operationRepository.findById(operationId).map(this::followStatus);
@@ -189,15 +193,25 @@ public class PortabilityApplicationService implements
 
             PortabilityOperation updated = operationRepository.updateStatus(
                     current.operationId(), central.status(), central.rejectionReason());
-            auditEventRepository.append(new AuditEvent(
-                    UUID.randomUUID().toString(),
-                    updated.operationId(),
-                    eventType(central.status()),
-                    statusMessage(central, current.protocol()),
-                    Instant.now()));
+            appendTransitionEvent(updated, central);
             current = updated;
         }
         return current;
+    }
+
+    private void appendTransitionEvent(PortabilityOperation operation, CentralOperationStatus central) {
+        String type = eventType(central.status());
+        boolean alreadyRecorded = auditEventRepository.findByOperationId(operation.operationId()).stream()
+                .anyMatch(event -> type.equals(event.eventType()));
+        if (alreadyRecorded) {
+            return;
+        }
+        auditEventRepository.append(new AuditEvent(
+                UUID.randomUUID().toString(),
+                operation.operationId(),
+                type,
+                statusMessage(central, operation.protocol()),
+                Instant.now()));
     }
 
     private void appendIntegrationFailure(String operationId, String context,
@@ -233,6 +247,7 @@ public class PortabilityApplicationService implements
     }
 
     @Override
+    @Transactional
     public Optional<PortabilityOperation> updateReceivingAccount(
             String operationId,
             ReceivingAccount receivingAccount

@@ -12,6 +12,7 @@ import com.portability.domain.ports.in.UpdateReceivingAccountUseCase;
 import com.portability.domain.ports.out.CentralUnavailableException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -173,6 +174,15 @@ class PortabilityControllerContractTest {
         mockMvc.perform(get("/api/portability/OPE-1"))
                 .andExpect(status().isBadGateway())
                 .andExpect(jsonPath("$.message").value("Central indisponível"));
+    }
+
+    @Test
+    void mustRespond409WhenConcurrentUpdateWins() throws Exception {
+        when(getOperationStatusUseCase.getOperationStatus("OPE-1"))
+                .thenThrow(new OptimisticLockingFailureException("versão desatualizada"));
+
+        mockMvc.perform(get("/api/portability/OPE-1"))
+                .andExpect(status().isConflict());
     }
 
     @Test

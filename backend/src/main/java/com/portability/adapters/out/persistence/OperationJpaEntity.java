@@ -12,6 +12,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.OrderColumn;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -61,6 +62,10 @@ public class OperationJpaEntity {
 
     @Column(name = "requested_at", nullable = false)
     private Instant requestedAt;
+
+    @Version
+    @Column(name = "version", nullable = false)
+    private long version;
 
     public String getOperationId() {
         return operationId;
@@ -156,5 +161,13 @@ public class OperationJpaEntity {
 
     public void setRequestedAt(Instant requestedAt) {
         this.requestedAt = requestedAt;
+    }
+
+    public long getVersion() {
+        return version;
+    }
+
+    public void setVersion(long version) {
+        this.version = version;
     }
 }

@@ -3,6 +3,7 @@ package com.portability.adapters.in.web;
 import com.portability.domain.model.BeneficiaryNotAuthorizedException;
 import com.portability.domain.model.OperationNotConfirmedException;
 import com.portability.domain.ports.out.CentralUnavailableException;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -42,5 +43,12 @@ public class ApiExceptionHandler {
     public ResponseEntity<Map<String, String>> handleCentralFailure(CentralUnavailableException exception) {
         return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
                 .body(Map.of("message", exception.getMessage()));
+    }
+
+    @ExceptionHandler(OptimisticLockingFailureException.class)
+    public ResponseEntity<Map<String, String>> handleConcurrentUpdate(
+            OptimisticLockingFailureException exception) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(Map.of("message", "Operação alterada por outra requisição; tente novamente"));
     }
 }

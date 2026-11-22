@@ -1,0 +1,111 @@
+package com.portability.application;
+
+import com.portability.adapters.out.persistence.OperationJpaEntity;
+import com.portability.adapters.out.persistence.SpringDataOperationRepository;
+import com.portability.domain.model.AuditEvent;
+import com.portability.domain.model.DiscountInstallment;
+import com.portability.domain.model.InstallmentStatus;
+import com.portability.domain.model.OperationStatus;
+import com.portability.domain.model.PortabilityOperation;
+import com.portability.domain.model.ReceivingAccount;
+import com.portability.domain.ports.in.StartPortabilityUseCase;
+import com.portability.domain.ports.out.AuditEventRepository;
+import com.portability.domain.ports.out.AuthorizationRepository;
+import com.portability.domain.ports.out.CentralAuthorizationPort;
+import com.portability.domain.ports.out.CentralPortabilityPort;
+import com.portability.domain.ports.out.DiscountAgendaPort;
+import com.portability.domain.ports.out.OperationRepository;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.dao.OptimisticLockingFailureException;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+
+import java.math.BigDecimal;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.util.List;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.when;
+
+@SpringBootTest
+@ActiveProfiles("test")
+class OperationTransactionalTest {
+
+    private static final String BENEFICIARY_ID = "BEN-TX-1";
+    private static final String AGREEMENT_ID = "AGR-TX-1";
+    private static final String INSTALLMENT_ID = "INS-TX-1";
+    private static final String OPERATION_ID = "OPE-TX-1";
+    private static final String PROTOCOL = "PRT-TX-1";
+    private static final String KEY = "key-tx-1";
+
+    @Autowired
+    private StartPortabilityUseCase startPortabilityUseCase;
+
+    @Autowired
+    private OperationRepository operationRepository;
+
+    @Autowired
+    private SpringDataOperationRepository springOperations;
+
+    @MockitoBean
+    private AuthorizationRepository authorizationRepository;
+
+    @MockitoBean(name = "centralClient", extraInterfaces = {
+            CentralAuthorizationPort.class, DiscountAgendaPort.class})
+    private CentralPortabilityPort centralPortabilityPort;
+
+    @MockitoBean
+    private AuditEventRepository auditEventRepository;
+
+    @AfterEach
+    void cleanUp() {
+        springOperations.deleteAll();
+    }
+
+    @Test
+    void mustRollbackOperationWhenAuditAppendFails() {
+        when(authorizationRepository.existsByBeneficiaryId(BENEFICIARY_ID)).thenReturn(true);
+        when(((DiscountAgendaPort) centralPortabilityPort).fetchAgenda(BENEFICIARY_ID))
+                .thenReturn(List.of(new DiscountInstallment(INSTALLMENT_ID, AGREEMENT_ID,
+                        new BigDecimal("120.50"), LocalDate.now().plusDays(10), InstallmentStatus.OPEN)));
+        when(centralPortabilityPort.registerPortability(anyString(), anyList(), anyString(), any()))
+                .thenReturn(PROTOCOL);
+        when(auditEventRepository.append(any(AuditEvent.class)))
+                .thenThrow(new IllegalStateException("audit unavailable"));
+
+        assertThrows(IllegalStateException.class, () -> startPortabilityUseCase.startPortability(
+                BENEFICIARY_ID, List.of(INSTALLMENT_ID), "Nova Credora S.A.",
+                new ReceivingAccount("001", "1234", "56789-0")));
+
+        assertEquals(0, springOperations.count());
+    }
+
+    @Test
+    void mustRejectStaleUpdateWithOptimisticLock() {
+        operationRepository.save(pendingOperation(), KEY);
+        OperationJpaEntity first = springOperations.findById(OPERATION_ID).orElseThrow();
+        OperationJpaEntity second = springOperations.findById(OPERATION_ID).orElseThrow();
+        first.setStatus(OperationStatus.CONFIRMED);
+        second.setStatus(OperationStatus.REJECTED);
+
+        springOperations.save(first);
+
+        assertThrows(OptimisticLockingFailureException.class, () -> springOperations.save(second));
+        assertEquals(OperationStatus.CONFIRMED, springOperations.findById(OPERATION_ID).orElseThrow().getStatus());
+    }
+
+    private static PortabilityOperation pendingOperation() {
+        return new PortabilityOperation(
+                OPERATION_ID, BENEFICIARY_ID, List.of(INSTALLMENT_ID), "Nova Credora S.A.",
+                new ReceivingAccount("001", "1234", "56789-0"), OperationStatus.PENDING, PROTOCOL, null,
+                Instant.parse("2026-11-22T12:34:56Z"));
+    }
+}
